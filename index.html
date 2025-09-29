@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>USDT Staking dApp (BSC Testnet)</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 <style>
   :root{--card:#ffffff;--line:#eaeaea;--txt:#222}
   *{box-sizing:border-box} body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;
@@ -127,8 +127,8 @@ const ERC20_ABI = [
 let provider, signer, account, staking, usdt, dec = 6;
 
 const $ = (id)=>document.getElementById(id);
-const fmt = (n, d=dec)=> (Number(ethers.formatUnits(n, d))).toLocaleString(undefined,{maximumFractionDigits:6});
-const parse = (x, d=dec)=> ethers.parseUnits(String(x||"0"), d);
+const fmt = (n, d=dec)=> Number(ethers.utils.formatUnits(n, d)).toLocaleString(undefined,{maximumFractionDigits:6});
+const parse = (x, d=dec)=> ethers.utils.parseUnits(String(x||"0"), d);
 const ts = (t)=> Number(t) ? new Date(Number(t)*1000).toLocaleString() : "-";
 
 function setStatus(msg, cls="muted"){ const el=$("status"); el.className=cls; el.textContent=msg; }
@@ -150,7 +150,7 @@ async function connect(){
   if(!window.ethereum){ alert("Install MetaMask / open in a wallet dApp browser"); return; }
   setStatus("Connecting...");
   await ensureBscTestnet();
-  provider = new ethers.BrowserProvider(window.ethereum);
+provider = new ethers.providers.Web3Provider(window.ethereum);
   await provider.send("eth_requestAccounts", []);
   signer = await provider.getSigner();
   account = await signer.getAddress();
@@ -217,7 +217,7 @@ async function deposit(){
   try{
     const amtStr = $("depAmt").value || "0";
     const units = parse(amtStr);
-    const ref = $("refAddr").value.trim() || ethers.ZeroAddress;
+const ref = $("refAddr").value.trim() || ethers.constants.AddressZero;
 
     // Optional: auto-approve if allowance insufficient
     const allowance = await usdt.allowance(account, STAKING_ADDRESS);
