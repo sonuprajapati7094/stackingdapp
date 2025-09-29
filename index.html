@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>USDT Staking dApp (BSC Testnet)</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.min.js"></script>
+<style>
+  :root{--card:#ffffff;--line:#eaeaea;--txt:#222}
+  *{box-sizing:border-box} body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  color:var(--txt); margin:24px; background:#f7f7f8}
+  .wrap{max-width:920px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,.03)}
+  h1{font-size:24px;margin:0 0 8px} h2{font-size:18px;margin:0 0 8px}
+  button{padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
+  input{padding:10px;border:1px solid var(--line);border-radius:10px;min-width:180px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .muted{color:#666} .mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+  .ok{color:#067d3c} .warn{color:#b15b00} .err{color:#b00020}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+  .tag{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>USDT Staking dApp <span class="tag">BSC Testnet</span></h1>
+  <div class="card">
+    <div class="row">
+      <button id="connectBtn">🔌 Connect Wallet</button>
+      <div><b>Account:</b> <span id="account" class="mono">-</span></div>
+      <div><b>Network:</b> <span id="network" class="mono">-</span></div>
+      <div id="status" class="muted"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Contract Info</h2>
+    <div class="grid">
+      <div>Staking Contract: <span id="stakingAddr" class="mono"></span></div>
+      <div>USDT Token: <span id="tokenAddr" class="mono"></span></div>
+      <div>Min Tx: <span id="minTx"></span></div>
+      <div>Token Decimals: <span id="decimals"></span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your Overview</h2>
+    <div class="grid">
+      <div>Your USDT Balance: <b id="usdtBal">-</b></div>
+      <div>Your Staked: <b id="staked">-</b></div>
+      <div>Pending Rewards: <b id="pending">-</b></div>
+      <div>Lock Ends: <b id="lockEnd">-</b></div>
+      <div>Total Deposited: <b id="totalDeposited">-</b></div>
+      <div>Remaining to 3× Cap: <b id="remainCap">-</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Deposit (Stake)</h2>
+    <div class="row">
+      <input id="depAmt" placeholder="Amount (USDT)"/>
+      <input id="refAddr" placeholder="Referrer (optional 0x...)"/>
+      <button id="approveBtn">Approve</button>
+      <button id="depositBtn">Deposit</button>
+    </div>
+    <div class="muted">Tip: First time, press <b>Approve</b> then <b>Deposit</b>.</div>
+  </div>
+
+  <div class="card">
+    <h2>Claim Rewards</h2>
+    <div class="row">
+      <button id="claimBtn">Claim</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Withdraw Principal</h2>
+    <div class="row">
+      <input id="wdAmt" placeholder="Amount (USDT)"/>
+      <button id="withdrawBtn">Withdraw</button>
+    </div>
+    <div class="muted">Note: Withdraw only after lock period ends.</div>
+  </div>
+
+  <div class="card">
+    <div class="muted">
+      This site works with MetaMask / Trust Wallet on <b>BSC Testnet</b> (ChainId 97).
+    </div>
+  </div>
+</div>
+
+<script>
+/** ====== EDIT THESE TWO LINES ====== **/
+const STAKING_ADDRESS = "0x71E78A6621A3Af5B7A6B7f24257032c2D1d30F7f";
+const TOKEN_ADDRESS   = "0x8B953059f82F4C5B68E3Ec978F5559588fD2972D";
+/** ================================== **/
+
+// BSC Testnet (97)
+const BSC_TESTNET = {
+  chainId: '0x61',
+  chainName: 'BNB Smart Chain Testnet',
+  nativeCurrency: { name: 'BNB', symbol: 'tBNB', decimals: 18 },
+  rpcUrls: ['https://data-seed-prebsc-1-s1.bnbchain.org:8545'],
+  blockExplorerUrls: ['https://testnet.bscscan.com/'],
+};
+
+// Minimal ABI
+const STAKING_ABI = [
+  "function users(address) view returns (uint256 totalDeposited,uint256 staked,uint256 rewardDebt,uint256 paidRewards,uint256 paidReferrals,uint256 lastAccrue,uint256 lockEnd,address upline)",
+  "function pendingRewards(address) view returns (uint256)",
+  "function remainingToCap(address) view returns (uint256)",
+  "function minTx() view returns (uint256)",
+  "function tokenDecimals() view returns (uint8)",
+  "function deposit(uint256 amount, address referrer)",
+  "function claimRewards()",
+  "function withdrawPrincipal(uint256 amount)"
+];
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address,address) view returns (uint256)",
+  "function approve(address,uint256) returns (bool)",
+  "function decimals() view returns (uint8)"
+];
+
+let provider, signer, account, staking, usdt, dec = 6;
+
+const $ = (id)=>document.getElementById(id);
+const fmt = (n, d=dec)=> (Number(ethers.formatUnits(n, d))).toLocaleString(undefined,{maximumFractionDigits:6});
+const parse = (x, d=dec)=> ethers.parseUnits(String(x||"0"), d);
+const ts = (t)=> Number(t) ? new Date(Number(t)*1000).toLocaleString() : "-";
+
+function setStatus(msg, cls="muted"){ const el=$("status"); el.className=cls; el.textContent=msg; }
+
+async function ensureBscTestnet(){
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  if (chainId !== BSC_TESTNET.chainId) {
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BSC_TESTNET.chainId }] });
+    } catch (e) {
+      if (e.code === 4902) {
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [BSC_TESTNET] });
+      } else { throw e; }
+    }
+  }
+}
+
+async function connect(){
+  if(!window.ethereum){ alert("Install MetaMask / open in a wallet dApp browser"); return; }
+  setStatus("Connecting...");
+  await ensureBscTestnet();
+  provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = await provider.getSigner();
+  account = await signer.getAddress();
+
+  staking = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+  usdt    = new ethers.Contract(TOKEN_ADDRESS,   ERC20_ABI,   signer);
+  try { dec = await usdt.decimals(); } catch(_) { dec = 6; }
+
+  $("account").textContent = account;
+  $("network").textContent = "BSC Testnet (97)";
+  $("stakingAddr").textContent = STAKING_ADDRESS;
+  $("tokenAddr").textContent = TOKEN_ADDRESS;
+  $("decimals").textContent = dec;
+
+  // Prefill ref from URL (?ref=0x...)
+  try {
+    const u = new URL(window.location.href);
+    const r = u.searchParams.get("ref");
+    if(r) $("refAddr").value = r;
+  } catch {}
+
+  await refresh();
+  setStatus("Connected ✔", "ok");
+}
+
+async function refresh(){
+  if(!signer) return;
+  const bal = await usdt.balanceOf(account);
+  $("usdtBal").textContent = fmt(bal);
+
+  const u = await staking.users(account);
+  $("staked").textContent = fmt(u.staked);
+  $("totalDeposited").textContent = fmt(u.totalDeposited);
+  $("lockEnd").textContent = ts(u.lockEnd);
+
+  const pend = await staking.pendingRewards(account);
+  $("pending").textContent = fmt(pend);
+
+  const remain = await staking.remainingToCap(account);
+  $("remainCap").textContent = fmt(remain);
+
+  try {
+    const m = await staking.minTx();
+    $("minTx").textContent = fmt(m) + " USDT";
+  } catch { $("minTx").textContent = "-"; }
+}
+
+async function approve(){
+  try{
+    setStatus("Approving...");
+    const amtStr = $("depAmt").value || "0";
+    const units = parse(amtStr);
+    const tx = await usdt.approve(STAKING_ADDRESS, units);
+    await tx.wait();
+    await refresh();
+    setStatus("Approve successful ✔", "ok");
+    alert("Approved!");
+  }catch(e){
+    console.error(e); setStatus("Approve failed", "err"); alert("Approve failed: " + (e.info?.error?.message || e.message));
+  }
+}
+
+async function deposit(){
+  try{
+    const amtStr = $("depAmt").value || "0";
+    const units = parse(amtStr);
+    const ref = $("refAddr").value.trim() || ethers.ZeroAddress;
+
+    // Optional: auto-approve if allowance insufficient
+    const allowance = await usdt.allowance(account, STAKING_ADDRESS);
+    if(allowance < units){
+      setStatus("Auto-approving allowance...");
+      await (await usdt.approve(STAKING_ADDRESS, units)).wait();
+    }
+
+    setStatus("Depositing...");
+    const tx = await staking.deposit(units, ref);
+    await tx.wait();
+    await refresh();
+    setStatus("Deposit successful ✔", "ok");
+    alert("Deposited!");
+  }catch(e){
+    console.error(e); setStatus("Deposit failed", "err"); alert("Deposit failed: " + (e.info?.error?.message || e.message));
+  }
+}
+
+async function claim(){
+  try{
+    setStatus("Claiming rewards...");
+    const tx = await staking.claimRewards();
+    await tx.wait();
+    await refresh();
+    setStatus("Claim successful ✔", "ok");
+    alert("Rewards claimed!");
+  }catch(e){
+    console.error(e); setStatus("Claim failed", "err"); alert("Claim failed: " + (e.info?.error?.message || e.message));
+  }
+}
+
+async function withdrawP(){
+  try{
+    const amtStr = $("wdAmt").value || "0";
+    const units = parse(amtStr);
+    setStatus("Withdrawing principal...");
+    const tx = await staking.withdrawPrincipal(units);
+    await tx.wait();
+    await refresh();
+    setStatus("Withdraw successful ✔", "ok");
+    alert("Withdrawn!");
+  }catch(e){
+    console.error(e); setStatus("Withdraw failed", "err"); alert("Withdraw failed: " + (e.info?.error?.message || e.message));
+  }
+}
+
+$("connectBtn").onclick = connect;
+$("approveBtn").onclick = approve;
+$("depositBtn").onclick = deposit;
+$("claimBtn").onclick = claim;
+$("withdrawBtn").onclick = withdrawP;
+</script>
+</body>
+</html>
