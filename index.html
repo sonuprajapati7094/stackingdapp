@@ -1,178 +1,413 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>USDT Staking dApp</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; background:#f7f7f8; margin:20px; }
-  .card { background:#fff; padding:16px; border-radius:12px; margin:12px 0;
-          box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-  button { padding:10px 16px; border:none; border-radius:8px; cursor:pointer; }
-  input { padding:10px; border:1px solid #ccc; border-radius:8px; margin-right:8px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USDT Staking DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #fff; text-align: center; }
+    .container { margin-top: 50px; }
+    button { margin: 10px; padding: 10px 20px; cursor: pointer; }
+    input { margin: 5px; padding: 8px; }
+  </style>
 </head>
 <body>
-  <h1>🚀 USDT Staking dApp (BSC Testnet)</h1>
-
-  <div class="card">
-    <button id="connectBtn">🔌 Connect Wallet</button>
-    <p><b>Account:</b> <span id="account">-</span></p>
-    <p><b>Network:</b> <span id="network">-</span></p>
-    <p id="status"></p>
-  </div>
-
-  <div class="card">
-    <h3>Your Info</h3>
-    <p>Balance: <span id="usdtBal">-</span> USDT</p>
-    <p>Staked: <span id="staked">-</span></p>
-    <p>Pending Rewards: <span id="pending">-</span></p>
-    <p>Lock End: <span id="lockEnd">-</span></p>
-  </div>
-
-  <div class="card">
-    <h3>Stake</h3>
-    <input id="depAmt" placeholder="Amount (USDT)"/>
-    <button id="approveBtn">Approve</button>
-    <button id="depositBtn">Deposit</button>
-  </div>
-
-  <div class="card">
-    <h3>Claim</h3>
-    <button id="claimBtn">Claim Rewards</button>
-  </div>
-
-  <div class="card">
+  <div class="container">
+    <h1>💸 USDT Staking DApp</h1>
+    <button onclick="connectWallet()">🔗 Connect Wallet</button>
+    <p id="wallet">Wallet: Not Connected</p>
+    
+    <h3>Approve & Stake</h3>
+    <input type="number" id="stakeAmount" placeholder="Amount (USDT)">
+    <button onclick="approveTokens()">Approve</button>
+    <button onclick="depositTokens()">Deposit</button>
+    
+    <h3>Rewards</h3>
+    <button onclick="checkRewards()">Check Pending Rewards</button>
+    <p id="rewards">Rewards: 0 USDT</p>
+    <button onclick="claimRewards()">Claim Rewards</button>
+    
     <h3>Withdraw</h3>
-    <input id="wdAmt" placeholder="Amount (USDT)"/>
-    <button id="withdrawBtn">Withdraw</button>
+    <input type="number" id="withdrawAmount" placeholder="Amount (USDT)">
+    <button onclick="withdrawPrincipal()">Withdraw</button>
   </div>
 
-<script>
-// ==== CONFIG ====
-// apne addresses yahan daalo
-const STAKING_ADDRESS = "0x71E78A6621A3Af5B7A6B7f24257032c2D1d30F7f";
-const TOKEN_ADDRESS   = "0x8B953059f82F4C5B68E3Ec978F5559588fD2972D";
-const DEC = 6;
+  <script>
+    // ---------------- CONFIG ----------------
+    const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662"; // replace
+    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";   // replace
 
-// ==== ABIs ====
-const STAKING_ABI = [
-  "function users(address) view returns (uint256 totalDeposited,uint256 staked,uint256 rewardDebt,uint256 paidRewards,uint256 paidReferrals,uint256 lastAccrue,uint256 lockEnd,address upline)",
-  "function pendingRewards(address) view returns (uint256)",
-  "function remainingToCap(address) view returns (uint256)",
-  "function minTx() view returns (uint256)",
-  "function deposit(uint256 amount, address referrer)",
-  "function claimRewards()",
-  "function withdrawPrincipal(uint256 amount)"
+    // ---------------- ABI IMPORT ----------------
+    const stakingAbi = [
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "address", "name": "referrer", "type": "address" }
+    ],
+    "name": "deposit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "claimRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "withdrawPrincipal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "userAddr", "type": "address" }
+    ],
+    "name": "pendingRewards",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "userAddr", "type": "address" }
+    ],
+    "name": "users",
+    "outputs": [
+      { "internalType": "uint256", "name": "staked", "type": "uint256" },
+      { "internalType": "uint256", "name": "rewardDebt", "type": "uint256" },
+      { "internalType": "uint256", "name": "lastAction", "type": "uint256" },
+      { "internalType": "address", "name": "referrer", "type": "address" },
+      { "internalType": "uint256", "name": "totalEarned", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
 ];
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function allowance(address,address) view returns (uint256)",
-  "function approve(address,uint256) returns (bool)",
-  "function decimals() view returns (uint8)"
-];
+; // paste from Remix
+    const tokenAbi   = [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "spender",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			}
+		],
+		"name": "Approval",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			}
+		],
+		"name": "Transfer",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner_",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "spender",
+				"type": "address"
+			}
+		],
+		"name": "allowance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "spender",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "approve",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "balanceOf",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "decimals",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "mint",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "name",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "symbol",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalSupply",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "transfer",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "transferFrom",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+];   // paste from Remix
 
-// ==== Globals ====
-let provider, signer, account, staking, usdt;
+    let web3, accounts, staking, token;
 
-// ==== Helpers ====
-const $ = id => document.getElementById(id);
-const fmt = (n, d=DEC)=> Number(ethers.utils.formatUnits(n, d)).toLocaleString(undefined,{maximumFractionDigits:6});
-const parse = (x, d=DEC)=> ethers.utils.parseUnits(String(x||"0"), d);
-const ts = (t)=> Number(t) ? new Date(Number(t)*1000).toLocaleString() : "-";
-function setStatus(msg){ $("status").textContent = msg; }
+    // ---------------- CONNECT WALLET ----------------
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        document.getElementById("wallet").innerText = "Wallet: " + accounts[0];
+        staking = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
+        token   = new web3.eth.Contract(tokenAbi, TOKEN_ADDRESS);
+      } else {
+        alert("Please install MetaMask!");
+      }
+    }
 
-// ==== Connect ====
-async function connect(){
-  if(!window.ethereum){ alert("MetaMask not found"); return; }
-  try {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    signer   = provider.getSigner();
-    account  = await signer.getAddress();
-    staking  = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-    usdt     = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
+    // ---------------- APPROVE ----------------
+    async function approveTokens() {
+      let amount = document.getElementById("stakeAmount").value;
+      let decimals = await token.methods.decimals().call();
+      let value = web3.utils.toBN(amount * 10 ** decimals);
+      await token.methods.approve(STAKING_ADDRESS, value).send({ from: accounts[0] });
+      alert("Approved " + amount + " USDT");
+    }
 
-    $("account").textContent = account;
-    $("network").textContent = "BSC Testnet";
-    setStatus("Connected ✔");
+    // ---------------- DEPOSIT ----------------
+    async function depositTokens() {
+      let amount = document.getElementById("stakeAmount").value;
+      let decimals = await token.methods.decimals().call();
+      let value = web3.utils.toBN(amount * 10 ** decimals);
+      await staking.methods.deposit(value, "0x0000000000000000000000000000000000000000").send({ from: accounts[0] });
+      alert("Deposited " + amount + " USDT");
+    }
 
-    await refresh();
-  } catch(e){ console.error(e); setStatus("Connect failed: "+e.message); }
-}
+    // ---------------- REWARDS ----------------
+    async function checkRewards() {
+      let rewards = await staking.methods.pendingRewards(accounts[0]).call();
+      let decimals = await token.methods.decimals().call();
+      document.getElementById("rewards").innerText = "Rewards: " + (rewards / 10 ** decimals) + " USDT";
+    }
 
-// ==== Refresh ====
-async function refresh(){
-  try {
-    const bal = await usdt.balanceOf(account);
-    $("usdtBal").textContent = fmt(bal);
-  } catch(e){ $("usdtBal").textContent = "0"; }
+    async function claimRewards() {
+      await staking.methods.claimRewards().send({ from: accounts[0] });
+      alert("Rewards claimed!");
+    }
 
-  try {
-    const u = await staking.users(account);
-    $("staked").textContent = fmt(u.staked);
-    $("lockEnd").textContent = ts(u.lockEnd);
-  } catch(e){ $("staked").textContent = "0"; $("lockEnd").textContent = "-"; }
-
-  try {
-    const pend = await staking.pendingRewards(account);
-    $("pending").textContent = fmt(pend);
-  } catch(e){ $("pending").textContent = "0"; }
-}
-
-// ==== Approve ====
-async function approve(){
-  try {
-    const amt = $("depAmt").value;
-    const units = parse(amt);
-    const tx = await usdt.approve(STAKING_ADDRESS, units);
-    await tx.wait();
-    setStatus("Approve success ✔");
-  } catch(e){ console.error(e); setStatus("Approve failed: "+e.message); }
-}
-
-// ==== Deposit ====
-async function deposit(){
-  try {
-    const amt = $("depAmt").value;
-    const units = parse(amt);
-    const tx = await staking.deposit(units, ethers.constants.AddressZero);
-    await tx.wait();
-    setStatus("Deposit success ✔");
-    await refresh();
-  } catch(e){ console.error(e); setStatus("Deposit failed: "+e.message); }
-}
-
-// ==== Claim ====
-async function claim(){
-  try {
-    const tx = await staking.claimRewards();
-    await tx.wait();
-    setStatus("Claim success ✔");
-    await refresh();
-  } catch(e){ console.error(e); setStatus("Claim failed: "+e.message); }
-}
-
-// ==== Withdraw ====
-async function withdraw(){
-  try {
-    const amt = $("wdAmt").value;
-    const units = parse(amt);
-    const tx = await staking.withdrawPrincipal(units);
-    await tx.wait();
-    setStatus("Withdraw success ✔");
-    await refresh();
-  } catch(e){ console.error(e); setStatus("Withdraw failed: "+e.message); }
-}
-
-// ==== Event Bindings ====
-$("connectBtn").onclick = connect;
-$("approveBtn").onclick = approve;
-$("depositBtn").onclick = deposit;
-$("claimBtn").onclick = claim;
-$("withdrawBtn").onclick = withdraw;
-
-</script>
+    // ---------------- WITHDRAW ----------------
+    async function withdrawPrincipal() {
+      let amount = document.getElementById("withdrawAmount").value;
+      let decimals = await token.methods.decimals().call();
+      let value = web3.utils.toBN(amount * 10 ** decimals);
+      await staking.methods.withdrawPrincipal(value).send({ from: accounts[0] });
+      alert("Withdrawn " + amount + " USDT");
+    }
+  </script>
 </body>
 </html>
