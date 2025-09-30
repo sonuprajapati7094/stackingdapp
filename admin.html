@@ -1,112 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>🛠️ USDT Staking — Admin Panel</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚙️ Admin Panel - USDT Staking</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
-    body { background:#111; color:#fff; font-family:Arial, sans-serif; text-align:center; }
-    .card { background:#1c1c1c; padding:20px; margin:20px auto; border-radius:10px; max-width:600px; }
-    button { margin:5px; padding:10px 20px; border:none; border-radius:6px; cursor:pointer; }
-    button:hover { opacity:0.9; }
-    .primary { background:#f0b90b; color:#000; }
+    body { background:#0d0d0d; color:#fff; font-family:Arial; text-align:center; }
+    .card { background:#1e1e1e; padding:20px; margin:20px auto; width:500px; border-radius:12px; }
+    button { padding:10px 20px; border:none; border-radius:6px; margin:5px; cursor:pointer; }
+    .primary { background:#facc15; color:#000; }
     .secondary { background:#333; color:#fff; }
-    .danger { background:#d9534f; color:#fff; }
-    .info { background:#0275d8; color:#fff; }
+    .danger { background:#ef4444; color:#fff; }
+    input { padding:8px; margin:5px; width:80%; border-radius:6px; border:none; text-align:center; }
   </style>
 </head>
 <body>
-  <h2>🛠️ USDT Staking — Admin Panel</h2>
-  <button id="connectBtn" class="primary">🔗 Connect Admin Wallet</button>
-  <p id="wallet">Wallet: not connected</p>
-  <p id="status" style="color:red;">Connection failed</p>
+  <h2>⚙️ USDT Staking — Admin Panel</h2>
+
+  <button id="connectBtn" class="primary" onclick="connectWallet()">🔗 Connect Wallet</button>
+  <p id="wallet-address">Wallet: not connected</p>
 
   <div class="card">
-    <h3>Mint MockUSDT</h3>
-    <input type="text" id="mintTo" placeholder="Recipient Address" />
-    <input type="number" id="mintAmount" placeholder="Amount (USDT)" />
-    <button onclick="mintTokens()" class="primary">Mint</button>
+    <h3>Contract Info</h3>
+    <p id="owner">Owner: -</p>
+    <p id="roi">ROI (basis points): -</p>
+    <p id="lock">Lock Period: - days</p>
+    <p id="minTx">Minimum TX: - USDT</p>
+    <p id="capx">CapX (max 3x): -</p>
+    <p id="totalStaked">Total Staked: - USDT</p>
+    <p id="totalRewards">Total Rewards: - USDT</p>
+    <button class="secondary" onclick="loadInfo()">🔄 Refresh Info</button>
   </div>
 
   <div class="card">
-    <h3>Set Staking Params</h3>
-    <p>ROI (basis points), Lock (sec), MinTx (6 decimals), CapX</p>
-    <input type="number" id="roi" placeholder="ROI BP (e.g. 1800)" />
-    <input type="number" id="lock" placeholder="Lock Seconds (e.g. 7776000)" />
-    <input type="number" id="minTx" placeholder="MinTx (e.g. 1000000)" />
-    <input type="number" id="capx" placeholder="CapX (e.g. 3)" />
-    <button onclick="setParams()" class="info">Update Params</button>
-  </div>
-
-  <div class="card">
-    <h3>📊 System Overview</h3>
-    <p id="totalStaked">Total Staked: -</p>
-    <p id="totalRewards">Total Rewards Distributed: -</p>
-    <p id="roiBP">Current ROI: -</p>
-    <button onclick="getOverview()" class="secondary">Refresh Overview</button>
+    <h3>Update Params</h3>
+    <input id="roiInput" type="number" placeholder="ROI (basis points)">
+    <input id="lockInput" type="number" placeholder="Lock Period (seconds)">
+    <input id="minTxInput" type="number" placeholder="Min TX (USDT)">
+    <input id="capxInput" type="number" placeholder="CapX multiplier">
+    <button class="primary" onclick="setParams()">⚡ Update Params</button>
   </div>
 
 <script>
+let web3;
+let accounts;
+
 const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662";
-const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
 
-// ✅ MockUSDT ABI
-const tokenAbi = [
-  {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}
-];
-
-// ✅ Staking Contract ABI
+// ✅ Staking ABI (Admin functions included)
 const stakingAbi = [
-  {"inputs":[{"internalType":"uint256","name":"_roiBP","type":"uint256"},{"internalType":"uint256","name":"_lockSeconds","type":"uint256"},{"internalType":"uint256","name":"_minTx","type":"uint256"},{"internalType":"uint256","name":"_capX","type":"uint256"}],"name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+  { "inputs":[],"stateMutability":"nonpayable","type":"constructor" },
+  { "inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"lockSeconds","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"minTx","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+    "stateMutability":"view","type":"function"},
+  { "inputs":[
+      {"internalType":"uint256","name":"_roiBP","type":"uint256"},
+      {"internalType":"uint256","name":"_lockSeconds","type":"uint256"},
+      {"internalType":"uint256","name":"_minTx","type":"uint256"},
+      {"internalType":"uint256","name":"_capX","type":"uint256"}
+    ],
+    "name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
-let provider, signer, token, staking, admin;
+let stakingContract;
 
+// ✅ Connect Wallet
 async function connectWallet() {
-  try {
+  if (typeof window.ethereum !== "undefined") {
     await window.ethereum.request({ method: "eth_requestAccounts" });
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    signer = provider.getSigner();
-    admin = await signer.getAddress();
-    token = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
-    staking = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
-    document.getElementById("wallet").innerText = "Wallet: " + admin;
-    document.getElementById("status").innerText = "✅ Connected (Admin)";
-  } catch (err) {
-    document.getElementById("status").innerText = "❌ Connection failed";
+    web3 = new Web3(window.ethereum);
+    accounts = await web3.eth.getAccounts();
+    document.getElementById("wallet-address").innerText = "Wallet: " + accounts[0];
+    stakingContract = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
+    loadInfo();
+  } else {
+    alert("MetaMask not found!");
   }
 }
 
-async function mintTokens() {
-  const to = document.getElementById("mintTo").value;
-  const amount = document.getElementById("mintAmount").value;
-  await token.mint(to, ethers.utils.parseUnits(amount, 6));
+// ✅ Load contract info
+async function loadInfo() {
+  const owner = await stakingContract.methods.owner().call();
+  const roi = await stakingContract.methods.roiBP().call();
+  const lock = await stakingContract.methods.lockSeconds().call();
+  const minTx = await stakingContract.methods.minTx().call();
+  const capx = await stakingContract.methods.capX().call();
+  const totalStaked = await stakingContract.methods.totalStaked().call();
+  const totalRewards = await stakingContract.methods.totalRewards().call();
+
+  document.getElementById("owner").innerText = "Owner: " + owner;
+  document.getElementById("roi").innerText = "ROI (basis points): " + roi;
+  document.getElementById("lock").innerText = "Lock Period: " + (lock/86400) + " days";
+  document.getElementById("minTx").innerText = "Minimum TX: " + (minTx/1e6) + " USDT";
+  document.getElementById("capx").innerText = "CapX (max): " + capx;
+  document.getElementById("totalStaked").innerText = "Total Staked: " + (totalStaked/1e6) + " USDT";
+  document.getElementById("totalRewards").innerText = "Total Rewards: " + (totalRewards/1e6) + " USDT";
 }
 
+// ✅ Update Params
 async function setParams() {
-  const roi = document.getElementById("roi").value;
-  const lock = document.getElementById("lock").value;
-  const minTx = document.getElementById("minTx").value;
-  const capx = document.getElementById("capx").value;
-  await staking.setParams(roi, lock, minTx, capx);
-}
+  let roi = document.getElementById("roiInput").value;
+  let lock = document.getElementById("lockInput").value;
+  let minTx = document.getElementById("minTxInput").value;
+  let capx = document.getElementById("capxInput").value;
 
-async function getOverview() {
-  const staked = await staking.totalStaked();
-  const rewards = await staking.totalRewards();
-  const roi = await staking.roiBP();
-  document.getElementById("totalStaked").innerText = "Total Staked: " + ethers.utils.formatUnits(staked, 6) + " USDT";
-  document.getElementById("totalRewards").innerText = "Total Rewards Distributed: " + ethers.utils.formatUnits(rewards, 6) + " USDT";
-  document.getElementById("roiBP").innerText = "Current ROI: " + roi + " BP";
-}
+  if(!roi || !lock || !minTx || !capx) {
+    alert("Please fill all fields!");
+    return;
+  }
 
-document.getElementById("connectBtn").addEventListener("click", connectWallet);
+  await stakingContract.methods
+    .setParams(roi, lock, minTx*1e6, capx)
+    .send({ from: accounts[0] });
+
+  alert("Params updated successfully!");
+  loadInfo();
+}
 </script>
 </body>
 </html>
