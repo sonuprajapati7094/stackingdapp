@@ -24,9 +24,9 @@
   <p id="pending"></p>
   <button onclick="claim()">Claim Rewards</button>
 
-  <h3>Staked Balance</h3>
-  <button onclick="checkStaked()">Check Staked Balance</button>
-  <p id="staked"></p>
+  <h3>Staked Info</h3>
+  <button onclick="checkStaked()">Check Staked Info</button>
+  <pre id="staked"></pre>
 
   <script>
     // ---------------- CONFIG ----------------
@@ -77,7 +77,8 @@
 
     async function checkBalance() {
       const bal = await tokenContract.balanceOf(userAddress);
-      document.getElementById("balance").innerText = "Balance: " + ethers.utils.formatUnits(bal, 6) + " USDT";
+      document.getElementById("balance").innerText =
+        "Balance: " + ethers.utils.formatUnits(bal, 6) + " USDT";
     }
 
     async function approve() {
@@ -98,7 +99,8 @@
 
     async function checkPending() {
       const reward = await stakingContract.pendingRewards(userAddress);
-      document.getElementById("pending").innerText = "Pending Rewards: " + ethers.utils.formatUnits(reward, 6) + " USDT";
+      document.getElementById("pending").innerText =
+        "Pending Rewards: " + ethers.utils.formatUnits(reward, 6) + " USDT";
     }
 
     async function claim() {
@@ -109,7 +111,18 @@
 
     async function checkStaked() {
       const info = await stakingContract.getUserInfo(userAddress);
-      document.getElementById("staked").innerText = "Staked: " + ethers.utils.formatUnits(info.staked, 6) + " USDT";
+      const stakedAmount = info[0];
+      const lastAction = info[1];
+      const referrer = info[2];
+      const totalEarned = info[3];
+      const pending = info[4];
+
+      document.getElementById("staked").innerText =
+        "Staked: " + ethers.utils.formatUnits(stakedAmount, 6) + " USDT\n" +
+        "Total Earned: " + ethers.utils.formatUnits(totalEarned, 6) + " USDT\n" +
+        "Pending: " + ethers.utils.formatUnits(pending, 6) + " USDT\n" +
+        "Referrer: " + referrer + "\n" +
+        "Last Action: " + (lastAction > 0 ? new Date(lastAction * 1000).toLocaleString() : "N/A");
     }
   </script>
 </body>
