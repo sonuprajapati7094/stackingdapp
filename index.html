@@ -4,409 +4,154 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>USDT Staking DApp</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #111; color: #fff; text-align: center; }
-    .container { margin-top: 50px; }
-    button { margin: 10px; padding: 10px 20px; cursor: pointer; }
-    input { margin: 5px; padding: 8px; }
+    body { font-family: Arial, sans-serif; background: #111; color: #fff; text-align: center; padding: 30px; }
+    button { margin: 5px; padding: 10px 15px; cursor: pointer; border: none; border-radius: 5px; }
+    input { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
+    .container { margin-top: 20px; }
   </style>
 </head>
 <body>
+  <h2>🪙 USDT Staking DApp</h2>
+  <button onclick="connectWallet()">🔗 Connect Wallet</button>
+  <p id="wallet">Wallet: Not connected</p>
+
   <div class="container">
-    <h1>💸 USDT Staking DApp</h1>
-    <button onclick="connectWallet()">🔗 Connect Wallet</button>
-    <p id="wallet">Wallet: Not Connected</p>
-    
     <h3>Approve & Stake</h3>
-    <input type="number" id="stakeAmount" placeholder="Amount (USDT)">
-    <button onclick="approveTokens()">Approve</button>
-    <button onclick="depositTokens()">Deposit</button>
-    
+    <input type="number" id="amount" placeholder="Amount (USDT)">
+    <button onclick="approve()">Approve</button>
+    <button onclick="deposit()">Deposit</button>
+  </div>
+
+  <div class="container">
     <h3>Rewards</h3>
     <button onclick="checkRewards()">Check Pending Rewards</button>
     <p id="rewards">Rewards: 0 USDT</p>
     <button onclick="claimRewards()">Claim Rewards</button>
-    
+  </div>
+
+  <div class="container">
     <h3>Withdraw</h3>
     <input type="number" id="withdrawAmount" placeholder="Amount (USDT)">
-    <button onclick="withdrawPrincipal()">Withdraw</button>
+    <button onclick="withdraw()">Withdraw</button>
+  </div>
+
+  <div class="container">
+    <h3>📊 Staking Info</h3>
+    <button onclick="checkStaked()">Check Staked Balance</button>
+    <p id="stakedAmount">Staked: 0 USDT</p>
+    <p id="targetAmount">Target (3x Cap): 0 USDT</p>
+    <p id="daysTo3x">Days to reach 3x: 0 days</p>
   </div>
 
   <script>
-    // ---------------- CONFIG ----------------
+    // ================== CONFIG ==================
     const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662"; // replace
     const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";   // replace
 
-    // ---------------- ABI IMPORT ----------------
+    // =============== ABI IMPORT ===============
     const stakingAbi = [
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "amount", "type": "uint256" },
-      { "internalType": "address", "name": "referrer", "type": "address" }
-    ],
-    "name": "deposit",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "claimRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "withdrawPrincipal",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "userAddr", "type": "address" }
-    ],
-    "name": "pendingRewards",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "userAddr", "type": "address" }
-    ],
-    "name": "users",
-    "outputs": [
-      { "internalType": "uint256", "name": "staked", "type": "uint256" },
-      { "internalType": "uint256", "name": "rewardDebt", "type": "uint256" },
-      { "internalType": "uint256", "name": "lastAction", "type": "uint256" },
-      { "internalType": "address", "name": "referrer", "type": "address" },
-      { "internalType": "uint256", "name": "totalEarned", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  }
-];
-; // paste from Remix
-    const tokenAbi   = [
-	{
-		"inputs": [],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			}
-		],
-		"name": "Approval",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			}
-		],
-		"name": "Transfer",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner_",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			}
-		],
-		"name": "allowance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "spender",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "approve",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "balanceOf",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "decimals",
-		"outputs": [
-			{
-				"internalType": "uint8",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "mint",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "name",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "symbol",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalSupply",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "transfer",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "transferFrom",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	}
-];   // paste from Remix
+      {
+        "inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],
+        "name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"
+      },
+      { "inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function" },
+      { "inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],
+        "name":"withdrawPrincipal","outputs":[],"stateMutability":"nonpayable","type":"function"
+      },
+      { "inputs":[{"internalType":"address","name":"userAddr","type":"address"}],
+        "name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+        "stateMutability":"view","type":"function"
+      },
+      { "inputs":[{"internalType":"address","name":"","type":"address"}],
+        "name":"users","outputs":[
+          {"internalType":"uint256","name":"staked","type":"uint256"},
+          {"internalType":"uint256","name":"rewardDebt","type":"uint256"},
+          {"internalType":"uint256","name":"lastAction","type":"uint256"},
+          {"internalType":"address","name":"referrer","type":"address"},
+          {"internalType":"uint256","name":"totalEarned","type":"uint256"}],
+        "stateMutability":"view","type":"function"
+      },
+      { "inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" },
+      { "inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" }
+    ];
 
-    let web3, accounts, staking, token;
+    const tokenAbi = [
+      { "inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],
+        "name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"
+      },
+      { "inputs":[{"internalType":"address","name":"account","type":"address"}],
+        "name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"
+      },
+      { "inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function" }
+    ];
 
-    // ---------------- CONNECT WALLET ----------------
+    let web3, accounts, stakingContract, tokenContract;
+
     async function connectWallet() {
       if (window.ethereum) {
         web3 = new Web3(window.ethereum);
         accounts = await ethereum.request({ method: "eth_requestAccounts" });
         document.getElementById("wallet").innerText = "Wallet: " + accounts[0];
-        staking = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
-        token   = new web3.eth.Contract(tokenAbi, TOKEN_ADDRESS);
+        stakingContract = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
+        tokenContract = new web3.eth.Contract(tokenAbi, TOKEN_ADDRESS);
       } else {
         alert("Please install MetaMask!");
       }
     }
 
-    // ---------------- APPROVE ----------------
-    async function approveTokens() {
-      let amount = document.getElementById("stakeAmount").value;
-      let decimals = await token.methods.decimals().call();
-      let value = web3.utils.toBN(amount * 10 ** decimals);
-      await token.methods.approve(STAKING_ADDRESS, value).send({ from: accounts[0] });
+    async function approve() {
+      const amount = document.getElementById("amount").value;
+      const decimals = await tokenContract.methods.decimals().call();
+      const value = BigInt(amount) * BigInt(10 ** decimals);
+      await tokenContract.methods.approve(STAKING_ADDRESS, value).send({ from: accounts[0] });
       alert("Approved " + amount + " USDT");
     }
 
-    // ---------------- DEPOSIT ----------------
-    async function depositTokens() {
-      let amount = document.getElementById("stakeAmount").value;
-      let decimals = await token.methods.decimals().call();
-      let value = web3.utils.toBN(amount * 10 ** decimals);
-      await staking.methods.deposit(value, "0x0000000000000000000000000000000000000000").send({ from: accounts[0] });
+    async function deposit() {
+      const amount = document.getElementById("amount").value;
+      const decimals = await tokenContract.methods.decimals().call();
+      const value = BigInt(amount) * BigInt(10 ** decimals);
+      await stakingContract.methods.deposit(value, "0x0000000000000000000000000000000000000000").send({ from: accounts[0] });
       alert("Deposited " + amount + " USDT");
     }
 
-    // ---------------- REWARDS ----------------
     async function checkRewards() {
-      let rewards = await staking.methods.pendingRewards(accounts[0]).call();
-      let decimals = await token.methods.decimals().call();
-      document.getElementById("rewards").innerText = "Rewards: " + (rewards / 10 ** decimals) + " USDT";
+      const reward = await stakingContract.methods.pendingRewards(accounts[0]).call();
+      document.getElementById("rewards").innerText = "Rewards: " + (reward / 1e6) + " USDT";
     }
 
     async function claimRewards() {
-      await staking.methods.claimRewards().send({ from: accounts[0] });
+      await stakingContract.methods.claimRewards().send({ from: accounts[0] });
       alert("Rewards claimed!");
     }
 
-    // ---------------- WITHDRAW ----------------
-    async function withdrawPrincipal() {
-      let amount = document.getElementById("withdrawAmount").value;
-      let decimals = await token.methods.decimals().call();
-      let value = web3.utils.toBN(amount * 10 ** decimals);
-      await staking.methods.withdrawPrincipal(value).send({ from: accounts[0] });
-      alert("Withdrawn " + amount + " USDT");
+    async function withdraw() {
+      const amount = document.getElementById("withdrawAmount").value;
+      const decimals = await tokenContract.methods.decimals().call();
+      const value = BigInt(amount) * BigInt(10 ** decimals);
+      await stakingContract.methods.withdrawPrincipal(value).send({ from: accounts[0] });
+      alert("Withdrew " + amount + " USDT");
+    }
+
+    async function checkStaked() {
+      const user = await stakingContract.methods.users(accounts[0]).call();
+      const staked = user.staked / 1e6; // 6 decimals
+      const capX = await stakingContract.methods.capX().call();
+      const target = staked * capX;
+
+      const roiBP = await stakingContract.methods.roiBP().call();
+      const roiPercent = roiBP / 100;
+      const annualReward = (staked * roiPercent) / 100;
+      const dailyReward = annualReward / 365;
+
+      let daysNeeded = 0;
+      if (dailyReward > 0) daysNeeded = ((target - staked) / dailyReward).toFixed(0);
+
+      document.getElementById("stakedAmount").innerText = "Staked: " + staked + " USDT";
+      document.getElementById("targetAmount").innerText = "Target (3x Cap): " + target + " USDT";
+      document.getElementById("daysTo3x").innerText = "Days to reach 3x: " + daysNeeded + " days";
     }
   </script>
 </body>

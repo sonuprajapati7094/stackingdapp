@@ -1,160 +1,102 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Admin Panel - USDT Staking</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; background:#f7f7f8; margin:20px; }
-  .card { background:#fff; padding:16px; border-radius:12px; margin:12px 0;
-          box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-  button { padding:10px 16px; border:none; border-radius:8px; cursor:pointer; margin-top:8px; }
-  input { padding:10px; border:1px solid #ccc; border-radius:8px; margin:4px 0; width:300px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - USDT Staking</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #fff; text-align: center; padding: 30px; }
+    button { margin: 5px; padding: 10px 15px; cursor: pointer; border: none; border-radius: 5px; }
+    input { padding: 8px; margin: 5px; border-radius: 5px; border: none; }
+    .container { margin-top: 20px; padding: 20px; border: 1px solid #444; border-radius: 10px; }
+  </style>
 </head>
 <body>
-  <h1>⚙️ Admin Panel (Owner Only)</h1>
+  <h2>⚙️ USDT Staking Admin Panel</h2>
+  <button onclick="connectWallet()">🔗 Connect Wallet</button>
+  <p id="wallet">Wallet: Not connected</p>
 
-  <div class="card">
-    <button id="connectBtn">🔌 Connect Wallet</button>
-    <p><b>Account:</b> <span id="account">-</span></p>
-    <p><b>Status:</b> <span id="status">Not connected</span></p>
+  <div class="container">
+    <h3>📊 Global Stats</h3>
+    <p id="totalStaked">Total Staked: 0 USDT</p>
+    <p id="totalRewards">Total Rewards Distributed: 0 USDT</p>
+    <p id="roi">ROI: 0 %</p>
+    <p id="capx">CapX: 0x</p>
+    <p id="totalUsers">Total Users: 0</p>
+    <button onclick="loadStats()">🔄 Refresh Stats</button>
   </div>
 
-  <div class="card" id="adminPanel" style="display:none;">
-    <h3>💰 Mint MockUSDT</h3>
-    <input id="mintTo" placeholder="Recipient address"/>
-    <input id="mintAmt" placeholder="Amount (USDT)"/>
-    <button id="mintBtn">Mint</button>
-
-    <h3>⚙️ Set Staking Params</h3>
-    <input id="roi" placeholder="18 (ROI %)" />
-    <input id="lock" placeholder="7776000 (3 months in sec)" />
-    <input id="cap" placeholder="3 (3x)" />
-    <input id="minTx" placeholder="1000000 (1 USDT in 6 decimals)" />
-    <button id="paramsBtn">Update Params</button>
-
-    <h3>📊 Contract Stats</h3>
-    <button id="statsBtn">Refresh Stats</button>
-    <p><b>Total Staked:</b> <span id="totalStaked">-</span> USDT</p>
-    <p><b>Total Paid Rewards:</b> <span id="totalRewards">-</span> USDT</p>
-    <p><b>Total Paid Referrals:</b> <span id="totalRefs">-</span> USDT</p>
-    <p><b>Active Users:</b> <span id="activeUsers">-</span></p>
+  <div class="container">
+    <h3>⚙️ Admin Controls</h3>
+    <input type="number" id="roiBP" placeholder="ROI (basis points)">
+    <input type="number" id="lockSeconds" placeholder="Lock Seconds">
+    <input type="number" id="capX" placeholder="CapX">
+    <button onclick="setParams()">Update Params</button>
   </div>
 
-<script>
-// ==== CONFIG ====
-// 👇 Apne actual deployed addresses yahan dalna
-const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662";
-const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
-const DEC = 6;
+  <script>
+    // ================== CONFIG ==================
+    const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662"; // replace
+    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";   // replace
 
-// ==== ABIs ====
-// Staking contract ABI
-const STAKING_ABI = [
-  "function setParams(uint256,uint256,uint256,uint256)",
-  "function totalStaked() view returns (uint256)",
-  "function totalPaidRewards() view returns (uint256)",
-  "function totalPaidReferrals() view returns (uint256)",
-  "function activeUsers() view returns (uint256)"
-];
+    // =============== ABI IMPORT ===============
+    const stakingAbi = [
+      { "inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" },
+      { "inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" },
+      { "inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" },
+      { "inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function" },
+      { "inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function" },
+      { "inputs":[{"internalType":"uint256","name":"_roiBP","type":"uint256"},{"internalType":"uint256","name":"_lockSeconds","type":"uint256"},{"internalType":"uint256","name":"_capX","type":"uint256"}],
+        "name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function" },
+      { "inputs":[{"internalType":"address","name":"","type":"address"}],
+        "name":"users","outputs":[
+          {"internalType":"uint256","name":"staked","type":"uint256"},
+          {"internalType":"uint256","name":"rewardDebt","type":"uint256"},
+          {"internalType":"uint256","name":"lastAction","type":"uint256"},
+          {"internalType":"address","name":"referrer","type":"address"},
+          {"internalType":"uint256","name":"totalEarned","type":"uint256"}],
+        "stateMutability":"view","type":"function"
+      }
+    ];
 
-// MockUSDT ABI
-const ERC20_ABI = [
-  "function mint(address,uint256)",
-  "function owner() view returns (address)"
-];
+    let web3, accounts, stakingContract;
 
-// ==== Globals ====
-let provider, signer, account, staking, usdt;
-
-// ==== Helpers ====
-const $ = id => document.getElementById(id);
-const parse = (x, d=DEC)=> ethers.utils.parseUnits(String(x||"0"), d);
-function setStatus(msg){ $("status").textContent = msg; }
-
-// ==== Connect ====
-async function connect(){
-  if(!window.ethereum){ alert("MetaMask not found"); return; }
-  try {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    signer   = provider.getSigner();
-    account  = await signer.getAddress();
-    staking  = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-    usdt     = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
-
-    $("account").textContent = account;
-    setStatus("Connected ✔");
-
-    await checkOwner();
-  } catch(e){ console.error(e); setStatus("Connect failed: "+e.message); }
-}
-
-// ==== Owner Check ====
-async function checkOwner(){
-  try {
-    const owner = await usdt.owner();
-    if(owner.toLowerCase() === account.toLowerCase()){
-      $("adminPanel").style.display = "block";
-      setStatus("Owner verified ✔ Admin panel unlocked");
-    } else {
-      setStatus("Not contract owner ❌");
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        document.getElementById("wallet").innerText = "Wallet: " + accounts[0];
+        stakingContract = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
+      } else {
+        alert("Please install MetaMask!");
+      }
     }
-  } catch(e){ console.error(e); setStatus("Owner check failed"); }
-}
 
-// ==== Mint ====
-async function mintTokens(){
-  try {
-    const to = $("mintTo").value;
-    const amt = parse($("mintAmt").value);
-    const tx = await usdt.mint(to, amt);
-    await tx.wait();
-    setStatus("Mint successful ✔");
-  } catch(e){ console.error(e); setStatus("Mint failed: "+e.message); }
-}
+    async function loadStats() {
+      const staked = await stakingContract.methods.totalStaked().call();
+      const rewards = await stakingContract.methods.totalRewards().call();
+      const roiBP = await stakingContract.methods.roiBP().call();
+      const capX = await stakingContract.methods.capX().call();
 
-// ==== Params ====
-async function updateParams(){
-  try {
-    const roi  = $("roi").value || "18";
-    const lock = $("lock").value || "7776000"; // 90 days
-    const cap  = $("cap").value || "3";
-    const minT = $("minTx").value || "1000000"; // 1 USDT
+      // Approx user count: by reading from events (simplified demo -> showing stakers by manual fetch is better in real)
+      let totalUsers = "Not tracked directly";
 
-    const tx = await staking.setParams(roi, lock, cap, minT);
-    await tx.wait();
-    setStatus("Params updated ✔");
-  } catch(e){ console.error(e); setStatus("Params update failed: "+e.message); }
-}
+      document.getElementById("totalStaked").innerText = "Total Staked: " + (staked / 1e6) + " USDT";
+      document.getElementById("totalRewards").innerText = "Total Rewards Distributed: " + (rewards / 1e6) + " USDT";
+      document.getElementById("roi").innerText = "ROI: " + (roiBP / 100) + " %";
+      document.getElementById("capx").innerText = "CapX: " + capX + "x";
+      document.getElementById("totalUsers").innerText = "Total Users: " + totalUsers;
+    }
 
-// ==== Stats ====
-async function loadStats(){
-  try {
-    const staked  = await staking.totalStaked();
-    const rewards = await staking.totalPaidRewards();
-    const refs    = await staking.totalPaidReferrals();
-    const users   = await staking.activeUsers();
+    async function setParams() {
+      const roiBP = document.getElementById("roiBP").value;
+      const lockSeconds = document.getElementById("lockSeconds").value;
+      const capX = document.getElementById("capX").value;
 
-    $("totalStaked").textContent  = ethers.utils.formatUnits(staked, DEC);
-    $("totalRewards").textContent = ethers.utils.formatUnits(rewards, DEC);
-    $("totalRefs").textContent    = ethers.utils.formatUnits(refs, DEC);
-    $("activeUsers").textContent  = users.toString();
-
-    setStatus("Stats refreshed ✔");
-  } catch(e){
-    console.error(e);
-    setStatus("Stats load failed: " + e.message);
-  }
-}
-
-// ==== Bindings ====
-$("connectBtn").onclick = connect;
-$("mintBtn").onclick    = mintTokens;
-$("paramsBtn").onclick  = updateParams;
-$("statsBtn").onclick   = loadStats;
-</script>
+      await stakingContract.methods.setParams(roiBP, lockSeconds, capX).send({ from: accounts[0] });
+      alert("Parameters updated!");
+    }
+  </script>
 </body>
 </html>
