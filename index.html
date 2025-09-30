@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>USDT Staking — Final Dashboard (Fixed)</title>
+  <title>USDT Staking — Final Dashboard (Local Ethers)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body{background:#0b0b0c;color:#fff;font-family:Inter,system-ui,Arial;margin:0;padding:28px;display:flex;flex-direction:column;align-items:center}
@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <h1>🚀 USDT Staking — Final (Fixed)</h1>
+  <h1>🚀 USDT Staking — Final (Local Ethers)</h1>
   <div id="walletText" class="muted">Wallet: not connected</div>
   <div style="margin:14px"><button id="connectBtn" class="btn-yellow">Connect Wallet</button></div>
 
@@ -30,7 +30,6 @@
       <button class="btn-dark" id="approveBtn">Approve</button>
       <button class="btn-yellow" id="depositBtn">Deposit</button>
     </div>
-    <div class="small">Note: First Approve, then Deposit. Use decimals according to token (UI handles usual 6 decimals).</div>
   </div>
 
   <div class="card center">
@@ -54,191 +53,104 @@
     <div id="stakedInfo" class="muted" style="margin-top:14px">-</div>
   </div>
 
-<script>
-(async function(){
-  // ============ CONFIG (update if needed) ============
-  const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407"; // <-- your new staking contract
-  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // <-- change if your token address is different
+  <!-- ✅ Local ethers script -->
+  <script src="libs/ethers.min.js"></script>
 
-  // ============ ABIs (minimal, only needed methods) ============
-  const tokenAbi = [
-    "function decimals() view returns (uint8)",
-    "function approve(address,uint256) returns (bool)",
-    "function allowance(address,address) view returns (uint256)"
-  ];
-  const stakingAbi = [
-    "function deposit(uint256,address)",
-    "function claimRewards()",
-    "function withdrawPrincipal(uint256)",
-    "function pendingRewards(address) view returns (uint256)",
-    "function getUserInfo(address) view returns (uint256,uint256,address,uint256,uint256)"
-  ];
+  <script>
+  (async function(){
+    const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407";
+    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
 
-  // ============ Elements ============
-  const connectBtn = document.getElementById("connectBtn");
-  const walletText = document.getElementById("walletText");
-  const amountInput = document.getElementById("amountInput");
-  const approveBtn = document.getElementById("approveBtn");
-  const depositBtn = document.getElementById("depositBtn");
-  const pendingBtn = document.getElementById("pendingBtn");
-  const rewardsText = document.getElementById("rewardsText");
-  const claimBtn = document.getElementById("claimBtn");
-  const withdrawInput = document.getElementById("withdrawInput");
-  const withdrawBtn = document.getElementById("withdrawBtn");
-  const stakedBtn = document.getElementById("stakedBtn");
-  const stakedInfo = document.getElementById("stakedInfo");
-
-  // ============ state ============
-  let provider, signer, userAddress, token, staking, decimals = 6;
-
-  // ===== dynamic ethers loader with fallback =====
-  async function ensureEthers() {
-    if (window.ethers) return;
-    const urls = [
-      "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js",
-      "https://unpkg.com/ethers@5.7.2/dist/ethers.min.js"
+    const tokenAbi = [
+      "function decimals() view returns (uint8)",
+      "function approve(address,uint256) returns (bool)"
     ];
-    for (const url of urls) {
-      await new Promise(res=>{
-        const s = document.createElement('script');
-        s.src = url;
-        s.onload = ()=>{ res(); };
-        s.onerror = ()=>{ s.remove(); res(); };
-        document.head.appendChild(s);
-      });
-      if (window.ethers) return;
+    const stakingAbi = [
+      "function deposit(uint256,address)",
+      "function claimRewards()",
+      "function withdrawPrincipal(uint256)",
+      "function pendingRewards(address) view returns (uint256)",
+      "function getUserInfo(address) view returns (uint256,uint256,address,uint256,uint256)"
+    ];
+
+    const connectBtn = document.getElementById("connectBtn");
+    const walletText = document.getElementById("walletText");
+    const amountInput = document.getElementById("amountInput");
+    const approveBtn = document.getElementById("approveBtn");
+    const depositBtn = document.getElementById("depositBtn");
+    const pendingBtn = document.getElementById("pendingBtn");
+    const rewardsText = document.getElementById("rewardsText");
+    const claimBtn = document.getElementById("claimBtn");
+    const withdrawInput = document.getElementById("withdrawInput");
+    const withdrawBtn = document.getElementById("withdrawBtn");
+    const stakedBtn = document.getElementById("stakedBtn");
+    const stakedInfo = document.getElementById("stakedInfo");
+
+    let provider, signer, userAddress, token, staking, decimals = 6;
+
+    function fmt(bn){ try { return ethers.utils.formatUnits(bn, decimals); } catch(e){ return "0"; } }
+    function toUnits(v){ return ethers.utils.parseUnits(v||"0", decimals); }
+
+    async function connect(){
+      try{
+        if (!window.ethereum) { alert("No MetaMask detected"); return; }
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        walletText.textContent = "Wallet: " + userAddress;
+        connectBtn.textContent = "Connected";
+
+        token = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
+        staking = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
+        decimals = await token.decimals();
+      }catch(err){
+        alert("Wallet connect failed: " + err.message);
+      }
     }
-    throw new Error("ethers library could not be loaded from CDN. Check network / CSP.");
-  }
+    connectBtn.onclick = connect;
 
-  // small helpers
-  function fmt(bn){ try { return ethers.utils.formatUnits(bn, decimals); } catch(e){ return "0"; } }
-  function toUnits(v){ if(typeof v !== "string") v = String(v); return ethers.utils.parseUnits(v||"0", decimals); }
-
-  // connect wallet
-  async function connect(){
-    try{
-      await ensureEthers();
-      if (!window.ethereum) { alert("No injected wallet found (MetaMask). Install/enable MetaMask."); return; }
-      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-      await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
-      userAddress = await signer.getAddress();
-      walletText.textContent = "Wallet: " + userAddress;
-      connectBtn.textContent = "Connected";
-
-      token = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
-      staking = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
-
-      // try read decimals (default to 6 on failure)
-      try { decimals = await token.decimals(); } catch(e){ decimals = 6; console.warn("Couldn't fetch token.decimals(), defaulting to 6"); }
-      console.log("Connected:", userAddress, "decimals:", decimals);
-    }catch(err){
-      alert("Wallet connect failed: " + (err && err.message ? err.message : err));
-      console.error(err);
-    }
-  }
-  connectBtn.onclick = connect;
-
-  // ensure connected before any action
-  async function ensureConnectedOrThrow(){
-    if (!signer) {
-      await connect();
-      if (!signer) throw new Error("Wallet not connected");
-    }
-  }
-
-  // Approve
-  approveBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
-      const v = (amountInput.value||"").trim();
-      if (!v) { alert("Enter amount"); return; }
-      const amt = toUnits(v);
+    approveBtn.onclick = async ()=>{
+      const amt = toUnits(amountInput.value);
       const tx = await token.approve(STAKING_ADDRESS, amt);
       await tx.wait();
-      alert("Approve success");
-    }catch(e){ alert("Approve failed: " + (e && e.message ? e.message : e)); console.error(e); }
-  };
+      alert("Approved");
+    };
 
-  // Deposit (stake)
-  depositBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
-      const v = (amountInput.value||"").trim();
-      if (!v) { alert("Enter amount"); return; }
-      const amt = toUnits(v);
-      const tx = await staking.deposit(amt, ethers.constants.AddressZero); // no referrer
+    depositBtn.onclick = async ()=>{
+      const amt = toUnits(amountInput.value);
+      const tx = await staking.deposit(amt, ethers.constants.AddressZero);
       await tx.wait();
-      alert("Deposit success");
-    }catch(e){ alert("Deposit failed: " + (e && e.message ? e.message : e)); console.error(e); }
-  };
+      alert("Deposited");
+    };
 
-  // Pending rewards
-  pendingBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
+    pendingBtn.onclick = async ()=>{
       const p = await staking.pendingRewards(userAddress);
       rewardsText.textContent = "Rewards: " + fmt(p) + " USDT";
-    }catch(e){ alert("Pending error: " + (e && e.message ? e.message : e)); console.error(e); }
-  };
+    };
 
-  // Claim
-  claimBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
+    claimBtn.onclick = async ()=>{
       const tx = await staking.claimRewards();
       await tx.wait();
-      alert("Claimed OK");
-    }catch(e){ alert("Claim failed: " + (e && e.message ? e.message : e)); console.error(e); }
-  };
+      alert("Claimed");
+    };
 
-  // Withdraw principal
-  withdrawBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
-      const v = (withdrawInput.value||"").trim();
-      if (!v) { alert("Enter amount"); return; }
-      const amt = toUnits(v);
+    withdrawBtn.onclick = async ()=>{
+      const amt = toUnits(withdrawInput.value);
       const tx = await staking.withdrawPrincipal(amt);
       await tx.wait();
-      alert("Withdraw success");
-    }catch(e){ alert("Withdraw failed: " + (e && e.message ? e.message : e)); console.error(e); }
-  };
+      alert("Withdrawn");
+    };
 
-  // Check staked balance via getUserInfo
-  stakedBtn.onclick = async ()=>{
-    try{
-      await ensureConnectedOrThrow();
-      // call getUserInfo(address) which returns (staked, lastAction, referrer, totalEarned, pending)
+    stakedBtn.onclick = async ()=>{
       const info = await staking.getUserInfo(userAddress);
-      // it's a tuple - index based
-      const staked = fmt(info[0]);
-      const lastActionTs = Number(info[1]) || 0;
-      const referrer = info[2];
-      const totalEarned = fmt(info[3]);
-      const pending = fmt(info[4]);
-
-      const lastAction = lastActionTs ? new Date(lastActionTs * 1000).toLocaleString() : "-";
       stakedInfo.innerHTML = `
-        <div>Staked: <b>${staked} USDT</b></div>
-        <div>Pending: <b>${pending} USDT</b></div>
-        <div>Total Earned (claimed+accrued): <b>${totalEarned} USDT</b></div>
-        <div>Last action: <span class="muted">${lastAction}</span></div>
-        <div>Referrer: <span class="muted">${referrer && referrer !== ethers.constants.AddressZero ? referrer : "-"}</span></div>
+        Staked: ${fmt(info[0])} USDT<br>
+        Pending: ${fmt(info[4])} USDT<br>
+        Total Earned: ${fmt(info[3])} USDT
       `;
-    }catch(e){
-      // provide full error text to help debugging (revert / missing user struct etc.)
-      const msg = e && e.message ? e.message : String(e);
-      alert("Error fetching staked info: " + msg);
-      console.error("Staked info error:", e);
-    }
-  };
-
-  // auto-try to load ethers early (so user gets prompt if library blocked)
-  try { await ensureEthers(); } catch(e){ alert("Library load failed: " + e.message); console.error(e); }
-
-})();
-</script>
+    };
+  })();
+  </script>
 </body>
 </html>
