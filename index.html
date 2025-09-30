@@ -178,24 +178,56 @@ provider = new ethers.providers.Web3Provider(window.ethereum);
 
 async function refresh(){
   if(!signer) return;
-  const bal = await usdt.balanceOf(account);
-  $("usdtBal").textContent = fmt(bal);
 
-  const u = await staking.users(account);
-  $("staked").textContent = fmt(u.staked);
-  $("totalDeposited").textContent = fmt(u.totalDeposited);
-  $("lockEnd").textContent = ts(u.lockEnd);
+  try {
+    // ✅ USDT balance
+    const bal = await usdt.balanceOf(account);
+    $("usdtBal").textContent = fmt(bal);
+  } catch (e) {
+    console.warn("balanceOf failed:", e);
+    $("usdtBal").textContent = "0";
+  }
 
-  const pend = await staking.pendingRewards(account);
+  try {
+    // ✅ User details from staking contract
+    const u = await staking.users(account);
+    $("staked").textContent = fmt(u.staked);
+    $("totalDeposited").textContent = fmt(u.totalDeposited);
+    $("lockEnd").textContent = ts(u.lockEnd);
+  } catch (e) {
+    console.warn("users() failed:", e);
+    $("staked").textContent = "0";
+    $("totalDeposited").textContent = "0";
+    $("lockEnd").textContent = "-";
+  }
+
+  let pend = 0;
+  try {
+    // ✅ Safe pendingRewards call
+    pend = await staking.pendingRewards(account);
+  } catch (e) {
+    console.warn("pendingRewards failed (probably no deposit yet):", e);
+    pend = 0;
+  }
   $("pending").textContent = fmt(pend);
 
-  const remain = await staking.remainingToCap(account);
+  let remain = 0;
+  try {
+    // ✅ Safe remaining cap call
+    remain = await staking.remainingToCap(account);
+  } catch (e) {
+    console.warn("remainingToCap failed:", e);
+    remain = 0;
+  }
   $("remainCap").textContent = fmt(remain);
 
   try {
     const m = await staking.minTx();
     $("minTx").textContent = fmt(m) + " USDT";
-  } catch { $("minTx").textContent = "-"; }
+  } catch (e) {
+    console.warn("minTx failed:", e);
+    $("minTx").textContent = "-";
+  }
 }
 
 async function approve(){
