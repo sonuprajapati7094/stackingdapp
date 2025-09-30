@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>USDT Staking — Pro Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,175 +11,184 @@
       color: #fff;
       text-align: center;
       margin: 0;
-      padding: 20px;
+      padding: 0;
     }
     h1 {
-      margin-bottom: 20px;
+      margin: 20px 0;
     }
-    .card {
-      background: #1c1c1c;
-      padding: 20px;
+    .container {
       margin: 20px auto;
+      max-width: 500px;
+      background: #1e1e1e;
+      padding: 20px;
       border-radius: 12px;
-      max-width: 400px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.6);
+      box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
     }
     button {
-      padding: 10px 20px;
-      margin: 10px;
+      margin: 8px;
+      padding: 10px 18px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
     }
-    .yellow { background: #ffcc00; color: #000; }
-    .red { background: #e74c3c; color: #fff; }
-    .dark { background: #333; color: #fff; }
+    .btn-yellow { background: #facc15; color: #000; }
+    .btn-red { background: #ef4444; color: #fff; }
+    .btn-dark { background: #333; color: #fff; }
     input {
-      padding: 8px;
-      margin: 10px;
+      padding: 10px;
+      margin: 8px;
       border-radius: 6px;
       border: none;
-      width: 80%;
-      text-align: center;
+      width: 70%;
+    }
+    .section-title {
+      font-weight: bold;
+      margin-top: 15px;
+    }
+    .info {
+      margin: 10px 0;
+      font-size: 14px;
     }
   </style>
+  <!-- ✅ FIXED CDN LINK -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 </head>
 <body>
 
-  <h1>🌙 USDT Staking — Pro Dashboard</h1>
-  <button id="connectBtn" class="yellow">🔗 Connect Wallet</button>
+  <h1>🌕 USDT Staking — Pro Dashboard</h1>
+
+  <button id="connectWallet" class="btn-yellow">🔗 Connect Wallet</button>
   <p id="walletAddress">Wallet: not connected</p>
 
-  <div class="card">
-    <h3>Approve & Stake</h3>
+  <div class="container">
+    <div class="section-title">Approve & Stake</div>
     <input type="number" id="stakeAmount" placeholder="Amount (USDT)">
-    <button id="approveBtn" class="dark">Approve</button>
-    <button id="depositBtn" class="yellow">Deposit</button>
+    <button id="approveBtn" class="btn-dark">Approve</button>
+    <button id="depositBtn" class="btn-yellow">Deposit</button>
   </div>
 
-  <div class="card">
-    <h3>Rewards</h3>
-    <button id="pendingBtn" class="dark">Check Pending Rewards</button>
+  <div class="container">
+    <div class="section-title">Rewards</div>
+    <button id="checkRewards" class="btn-dark">Check Pending Rewards</button>
     <p id="rewards">Rewards: 0 USDT</p>
-    <button id="claimBtn" class="yellow">Claim Rewards</button>
+    <button id="claimBtn" class="btn-yellow">Claim Rewards</button>
   </div>
 
-  <div class="card">
-    <h3>Withdraw</h3>
+  <div class="container">
+    <div class="section-title">Withdraw</div>
     <input type="number" id="withdrawAmount" placeholder="Amount (USDT)">
-    <button id="withdrawBtn" class="red">Withdraw</button>
+    <button id="withdrawBtn" class="btn-red">Withdraw</button>
   </div>
 
-  <div class="card">
-    <h3>📊 Staking Info</h3>
-    <button id="checkStakeBtn" class="dark">Check Staked Balance</button>
-    <p id="stakedInfo">Staked: 0 USDT<br>Target (3x Cap): 0 USDT<br>Days to 3x: 0</p>
+  <div class="container">
+    <div class="section-title">📊 Staking Info</div>
+    <button id="checkStaked" class="btn-dark">Check Staked Balance</button>
+    <p id="stakedInfo">Staked: - USDT <br> Target (3x cap): - USDT <br> Days to reach 3x: -</p>
   </div>
 
   <script>
-    // ================= CONFIG =================
-    const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407"; // New staking contract
-    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // Mock USDT
+    // ✅ Replace with your deployed addresses
+    const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407";
+    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
 
-    // =============== ABI IMPORTS ===============
-    const stakingAbi = [
-      {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawPrincipal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"components":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"rewardDebt","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"}],"internalType":"struct USDTStakingReferrals.User","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
-    ];
-
+    // ✅ Token ABI (simplified ERC20)
     const tokenAbi = [
-      {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}
+      "function approve(address spender, uint256 amount) public returns (bool)",
+      "function allowance(address owner, address spender) public view returns (uint256)",
+      "function balanceOf(address account) public view returns (uint256)",
+      "function decimals() public view returns (uint8)"
     ];
 
-    let provider, signer, userAddress, stakingContract, tokenContract;
+    // ✅ Staking Contract ABI (important functions only)
+    const stakingAbi = [
+      "function deposit(uint256 amount, address referrer) public",
+      "function claimRewards() public",
+      "function withdrawPrincipal(uint256 amount) public",
+      "function pendingRewards(address userAddr) public view returns (uint256)",
+      "function users(address userAddr) public view returns (uint256 staked, uint256 rewardDebt, uint256 lastAction, address referrer, uint256 totalEarned)"
+    ];
 
-    // ============== WALLET CONNECT ==============
-    document.getElementById("connectBtn").onclick = async () => {
-      try {
-        if (typeof window.ethereum !== "undefined") {
+    let provider, signer, tokenContract, stakingContract;
+
+    document.getElementById("connectWallet").onclick = async () => {
+      if (typeof window.ethereum !== "undefined") {
+        try {
+          await ethereum.request({ method: "eth_requestAccounts" });
           provider = new ethers.providers.Web3Provider(window.ethereum);
-          await provider.send("eth_requestAccounts", []);
           signer = provider.getSigner();
-          userAddress = await signer.getAddress();
-          document.getElementById("walletAddress").innerText = "Wallet: " + userAddress;
+          const address = await signer.getAddress();
+          document.getElementById("walletAddress").innerText = "Wallet: " + address;
 
+          tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
           stakingContract = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
-          tokenContract   = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
 
-          console.log("✅ Wallet connected:", userAddress);
-        } else {
-          alert("Please install MetaMask!");
+          alert("✅ Wallet connected successfully!");
+        } catch (err) {
+          alert("Wallet connection failed: " + err.message);
         }
-      } catch (err) {
-        console.error("❌ Connection error:", err);
-        alert("Wallet connection failed: " + err.message);
+      } else {
+        alert("MetaMask not found. Please install it.");
       }
     };
 
-    // ============= FUNCTIONS =============
+    // Approve
     document.getElementById("approveBtn").onclick = async () => {
-      try {
-        let amount = document.getElementById("stakeAmount").value;
-        let tx = await tokenContract.approve(STAKING_ADDRESS, ethers.utils.parseUnits(amount, 6));
-        await tx.wait();
-        alert("Approved " + amount + " USDT ✅");
-      } catch (err) { console.error(err); }
+      const amount = document.getElementById("stakeAmount").value;
+      if (!amount) return alert("Enter amount");
+      const decimals = await tokenContract.decimals();
+      const amt = ethers.utils.parseUnits(amount, decimals);
+      await tokenContract.approve(STAKING_ADDRESS, amt);
+      alert("✅ Approved " + amount + " USDT");
     };
 
+    // Deposit
     document.getElementById("depositBtn").onclick = async () => {
-      try {
-        let amount = document.getElementById("stakeAmount").value;
-        let tx = await stakingContract.deposit(ethers.utils.parseUnits(amount, 6), "0x0000000000000000000000000000000000000000");
-        await tx.wait();
-        alert("Deposited " + amount + " USDT ✅");
-      } catch (err) { console.error(err); }
+      const amount = document.getElementById("stakeAmount").value;
+      if (!amount) return alert("Enter amount");
+      const decimals = await tokenContract.decimals();
+      const amt = ethers.utils.parseUnits(amount, decimals);
+      await stakingContract.deposit(amt, ethers.constants.AddressZero);
+      alert("✅ Deposited " + amount + " USDT");
     };
 
-    document.getElementById("pendingBtn").onclick = async () => {
-      try {
-        let rewards = await stakingContract.pendingRewards(userAddress);
-        document.getElementById("rewards").innerText = "Rewards: " + ethers.utils.formatUnits(rewards, 6) + " USDT";
-      } catch (err) { console.error(err); }
+    // Check Rewards
+    document.getElementById("checkRewards").onclick = async () => {
+      const address = await signer.getAddress();
+      const reward = await stakingContract.pendingRewards(address);
+      const decimals = await tokenContract.decimals();
+      document.getElementById("rewards").innerText =
+        "Rewards: " + ethers.utils.formatUnits(reward, decimals) + " USDT";
     };
 
+    // Claim Rewards
     document.getElementById("claimBtn").onclick = async () => {
-      try {
-        let tx = await stakingContract.claimRewards();
-        await tx.wait();
-        alert("Rewards claimed ✅");
-      } catch (err) { console.error(err); }
+      await stakingContract.claimRewards();
+      alert("✅ Rewards claimed!");
     };
 
+    // Withdraw
     document.getElementById("withdrawBtn").onclick = async () => {
-      try {
-        let amount = document.getElementById("withdrawAmount").value;
-        let tx = await stakingContract.withdrawPrincipal(ethers.utils.parseUnits(amount, 6));
-        await tx.wait();
-        alert("Withdrawn " + amount + " USDT ✅");
-      } catch (err) { console.error(err); }
+      const amount = document.getElementById("withdrawAmount").value;
+      if (!amount) return alert("Enter amount");
+      const decimals = await tokenContract.decimals();
+      const amt = ethers.utils.parseUnits(amount, decimals);
+      await stakingContract.withdrawPrincipal(amt);
+      alert("✅ Withdrawn " + amount + " USDT");
     };
 
-    document.getElementById("checkStakeBtn").onclick = async () => {
-      try {
-        let info = await stakingContract.getUserInfo(userAddress);
-        let cap = await stakingContract.capX();
-        let roi = await stakingContract.roiBP();
-
-        let staked = ethers.utils.formatUnits(info.staked, 6);
-        let target = (parseFloat(staked) * parseInt(cap)).toFixed(2);
-        let days = Math.floor((cap * 10000) / roi); // approx ROI calc
-
-        document.getElementById("stakedInfo").innerText =
-          "Staked: " + staked + " USDT\nTarget (3x Cap): " + target + " USDT\nDays to 3x: " + days;
-      } catch (err) { console.error(err); }
+    // Check Staked Info
+    document.getElementById("checkStaked").onclick = async () => {
+      const address = await signer.getAddress();
+      const user = await stakingContract.users(address);
+      const decimals = await tokenContract.decimals();
+      const staked = ethers.utils.formatUnits(user.staked, decimals);
+      const target = (parseFloat(staked) * 3).toFixed(2);
+      const days = Math.ceil((target - staked) / (0.18 * staked / 365)); // approx calc
+      document.getElementById("stakedInfo").innerHTML =
+        "Staked: " + staked + " USDT<br>" +
+        "Target (3x cap): " + target + " USDT<br>" +
+        "Days to reach 3x: " + (days > 0 ? days : "-");
     };
   </script>
 </body>
