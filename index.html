@@ -1,177 +1,304 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>🌙 USDT Staking — Pro Dashboard</title>
-<head>
-  <meta charset="UTF-8">
-  <title>🌙 USDT Staking — Pro Dashboard</title>
-  <!-- Ethers.js must load here -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <meta charset="utf-8" />
+  <title>USDT Staking — Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Ethers v5 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
   <style>
-    /* styling */
-  </style>
-</head>
-  <style>
-    body { background:#111; color:#fff; font-family: Arial, sans-serif; text-align:center; }
-    .container { max-width:600px; margin:20px auto; padding:20px; background:#1e1e1e; border-radius:12px; box-shadow:0 0 10px #000; }
-    button { padding:10px 20px; margin:5px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
-    .connect { background:#facc15; }
-    .approve { background:#333; color:#fff; }
-    .deposit { background:#facc15; }
-    .claim { background:#facc15; }
-    .withdraw { background:#dc2626; color:#fff; }
-    input { padding:10px; margin:5px; border-radius:6px; border:none; width:200px; text-align:center; }
-    h2 { margin-top:20px; color:#facc15; }
-    .section { margin:20px 0; padding:15px; background:#2a2a2a; border-radius:10px; }
+    /* Dark professional minimal styles */
+    :root{
+      --bg:#0f0f10; --card:#18181a; --muted:#bfbfbf; --accent:#ffc629; --danger:#e04e4e;
+      --glass: rgba(255,255,255,0.03);
+    }
+    body{background:linear-gradient(180deg,#080808,#0f0f10);color:#fff;font-family:Inter,system-ui,Arial;margin:0;padding:32px;display:flex;flex-direction:column;align-items:center;}
+    .container{width:920px;max-width:95%;}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    h1{margin:0;font-size:28px}
+    button{cursor:pointer;border:0;padding:10px 16px;border-radius:8px;background:var(--accent);color:#111;font-weight:600}
+    .card{background:var(--card);padding:28px;border-radius:12px;margin:18px 0;box-shadow:0 6px 18px rgba(0,0,0,0.5)}
+    .muted{color:var(--muted)}
+    .row{display:flex;gap:12px;align-items:center}
+    input[type="text"], input[type="number"]{padding:12px;border-radius:8px;border:0;background:var(--glass);color:#fff;min-width:220px}
+    .btn-dark{background:#272729;color:#ddd;padding:10px 14px;border-radius:8px}
+    .btn-danger{background:var(--danger);color:#fff;padding:10px 14px;border-radius:8px}
+    .center{text-align:center}
+    .small{font-size:14px;color:var(--muted)}
   </style>
 </head>
 <body>
-  <h1>🌙 USDT Staking — Pro Dashboard</h1>
-  <button onclick="connectWallet()" class="connect">🔗 Connect Wallet</button>
-  <p id="wallet">Wallet: not connected</p>
-
   <div class="container">
-    <div class="section">
-      <h2>Approve & Stake</h2>
-      <input id="amount" type="number" placeholder="Amount (USDT)" />
-      <button onclick="approve()" class="approve">Approve</button>
-      <button onclick="deposit()" class="deposit">Deposit</button>
+    <header>
+      <h1>💫 USDT Staking — Pro Dashboard</h1>
+      <div>
+        <button id="connectBtn">Connect Wallet</button>
+      </div>
+    </header>
+
+    <div class="center small muted" id="walletText">Wallet: not connected</div>
+
+    <!-- Approve & Stake -->
+    <div class="card">
+      <h2 class="center">Approve & Stake</h2>
+      <div class="center row" style="justify-content:center;margin-top:14px;">
+        <input id="amountInput" placeholder="Amount (USDT)" />
+        <button class="btn-dark" id="approveBtn">Approve</button>
+        <button id="depositBtn">Deposit</button>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>Rewards</h2>
-      <button onclick="checkPendingRewards()">Check Pending Rewards</button>
-      <p id="rewards">Rewards: 0 USDT</p>
-      <button onclick="claimRewards()" class="claim">Claim Rewards</button>
+    <!-- Rewards -->
+    <div class="card">
+      <h2 class="center">Rewards</h2>
+      <div class="center" style="margin-top:14px;">
+        <button class="btn-dark" id="pendingBtn">Check Pending Rewards</button>
+        <div style="height:14px"></div>
+        <div id="rewardsText" class="center small">Rewards: 0 USDT</div>
+        <div style="height:12px"></div>
+        <button id="claimBtn">Claim Rewards</button>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>Withdraw</h2>
-      <input id="withdrawAmount" type="number" placeholder="Amount (USDT)" />
-      <button onclick="withdrawPrincipal()" class="withdraw">Withdraw</button>
+    <!-- Withdraw -->
+    <div class="card">
+      <h2 class="center">Withdraw</h2>
+      <div class="center row" style="justify-content:center;margin-top:14px;">
+        <input id="withdrawInput" placeholder="Amount (USDT)" />
+        <button class="btn-danger" id="withdrawBtn">Withdraw</button>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>📊 Staking Info</h2>
-      <button onclick="checkStakedInfo()">Check Staked Balance</button>
-      <p id="stakedInfo">-</p>
+    <!-- Staking Info -->
+    <div class="card">
+      <h2 class="center">📊 Staking Info</h2>
+      <div class="center" style="margin-top:12px;">
+        <button class="btn-dark" id="stakedBtn">Check Staked Balance</button>
+      </div>
+      <div style="height:14px"></div>
+      <div class="center small muted" id="stakedInfo">-</div>
     </div>
   </div>
 
 <script>
-let provider, signer, tokenContract, stakingContract;
+(async function(){
+  // ======== CONFIG (replace only if you deploy new contracts) ========
+  const STAKING_ADDRESS = "0x8B336d8c0e8905aAd3583D93D187A9072e647662"; // staking contract (your)
+  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // mock USDT (6 decimals)
 
-const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407"; // staking contract
-const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // mock usdt
+  // ======== ABIs (minimal subset used by UI) ========
+  const tokenAbi = [
+    "function decimals() view returns (uint8)",
+    "function balanceOf(address) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+    "function transferFrom(address from, address to, uint256 amount) returns (bool)"
+  ];
 
-// ---- Token ABI ----
-const tokenAbi = [
-  "function approve(address spender,uint256 amount) external returns(bool)",
-  "function allowance(address owner,address spender) external view returns(uint256)",
-  "function balanceOf(address account) external view returns(uint256)",
-  "function decimals() external view returns(uint8)"
-];
+  const stakingAbi = [
+    "function deposit(uint256 amount, address referrer)",
+    "function claimRewards()",
+    "function withdrawPrincipal(uint256 amount)",
+    "function pendingRewards(address) view returns (uint256)",
+    "function getUserInfo(address) view returns (uint256 staked,uint256 lastAction,address referrer,uint256 totalEarned,uint256 pending)",
+    "function roiBP() view returns (uint256)",
+    "function lockSeconds() view returns (uint256)",
+    "function minTx() view returns (uint256)",
+    "function capX() view returns (uint256)"
+  ];
 
-// ---- Staking ABI ----
-const stakingAbi = [
-  "function deposit(uint256 amount,address referrer) external",
-  "function claimRewards() external",
-  "function withdrawPrincipal(uint256 amount) external",
-  "function pendingRewards(address userAddr) external view returns(uint256)",
-  "function users(address) view returns (uint256 staked, uint256 rewardDebt, uint256 lastAction, address referrer, uint256 totalEarned)"
-];
+  // ======== Elements ========
+  const connectBtn = document.getElementById("connectBtn");
+  const walletText = document.getElementById("walletText");
+  const amountInput = document.getElementById("amountInput");
+  const approveBtn = document.getElementById("approveBtn");
+  const depositBtn = document.getElementById("depositBtn");
+  const pendingBtn = document.getElementById("pendingBtn");
+  const rewardsText = document.getElementById("rewardsText");
+  const claimBtn = document.getElementById("claimBtn");
+  const withdrawInput = document.getElementById("withdrawInput");
+  const withdrawBtn = document.getElementById("withdrawBtn");
+  const stakedBtn = document.getElementById("stakedBtn");
+  const stakedInfo = document.getElementById("stakedInfo");
 
-async function connectWallet() {
-  try {
-    if (!window.ethereum) return alert("MetaMask not installed");
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    const addr = await signer.getAddress();
-    document.getElementById("wallet").innerText = "Wallet: " + addr;
+  // ======== Global state ========
+  let provider, signer, userAddress;
+  let tokenContract, stakingContract;
+  let tokenDecimals = 6; // default assume USDT-like
+  let isConnected = false;
 
-    tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
-    stakingContract = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
-
-    alert("Wallet connected successfully ✅");
-  } catch (err) {
-    alert("Wallet connection failed: " + err.message);
+  // Utility formatting
+  function toDisplay(amountBN) {
+    try {
+      return ethers.utils.formatUnits(amountBN, tokenDecimals);
+    } catch (e) { return amountBN.toString(); }
   }
-}
 
-async function approve() {
-  try {
-    const amount = document.getElementById("amount").value;
-    const decimals = await tokenContract.decimals();
-    const tx = await tokenContract.approve(STAKING_ADDRESS, ethers.utils.parseUnits(amount, decimals));
-    await tx.wait();
-    alert("Approval successful ✅");
-  } catch (err) {
-    alert("Approval failed: " + err.message);
+  function toUnits(amountStr) {
+    // accepts "1" "0.5" etc -> BigNumber in token smallest units
+    return ethers.utils.parseUnits((amountStr || "0").toString(), tokenDecimals);
   }
-}
 
-async function deposit() {
-  try {
-    const amount = document.getElementById("amount").value;
-    const decimals = await tokenContract.decimals();
-    const tx = await stakingContract.deposit(ethers.utils.parseUnits(amount, decimals), ethers.constants.AddressZero);
-    await tx.wait();
-    alert("Deposit successful ✅");
-  } catch (err) {
-    alert("Deposit failed: " + err.message);
+  // ======== Connect Wallet ========
+  async function connectWallet(){
+    try {
+      if (!window.ethereum) throw new Error("No injected wallet found (MetaMask).");
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      // Request accounts
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      userAddress = await signer.getAddress();
+      // instantiate contracts
+      tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
+      stakingContract = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
+      // read decimals
+      try { tokenDecimals = await tokenContract.decimals(); } catch(e){ tokenDecimals = 6; }
+      // update UI
+      walletText.textContent = "Wallet: " + userAddress;
+      connectBtn.textContent = "Connected";
+      isConnected = true;
+      console.log("Connected:", userAddress);
+    } catch (err) {
+      alert("Wallet connection failed: " + (err && err.message ? err.message : err));
+      console.error(err);
+    }
   }
-}
 
-async function checkPendingRewards() {
+  connectBtn.onclick = connectWallet;
+
+  // ======== Approve ========
+  approveBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    const amount = amountInput.value;
+    if (!amount || isNaN(Number(amount))) return alert("Enter valid amount");
+    const unit = toUnits(amount);
+    try {
+      const tx = await tokenContract.approve(STAKING_ADDRESS, unit);
+      await tx.wait();
+      alert("Approve transaction confirmed");
+    } catch(e){ console.error(e); alert("Approve failed: " + (e && e.message ? e.message : e)); }
+  };
+
+  // ======== Deposit ========
+  depositBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    const amount = amountInput.value;
+    if (!amount || isNaN(Number(amount))) return alert("Enter valid amount");
+    const unit = toUnits(amount);
+    try {
+      const allowance = await tokenContract.allowance(userAddress, STAKING_ADDRESS);
+      if (allowance.lt(unit)) {
+        return alert("Insufficient allowance — click Approve first");
+      }
+      const tx = await stakingContract.deposit(unit, ethers.constants.AddressZero);
+      await tx.wait();
+      alert("Deposit success");
+    } catch(e){ console.error(e); alert("Deposit failed: " + (e && e.message ? e.message : e)); }
+  };
+
+  // ======== Pending Rewards ========
+  pendingBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    try {
+      const pending = await stakingContract.pendingRewards(userAddress);
+      rewardsText.textContent = "Rewards: " + toDisplay(pending) + " USDT";
+    } catch(e){ console.error(e); alert("Error fetching pending rewards: " + (e && e.message ? e.message : e)); }
+  };
+
+  // ======== Claim Rewards ========
+  claimBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    try {
+      const tx = await stakingContract.claimRewards();
+      await tx.wait();
+      alert("Claim transaction confirmed");
+    } catch(e){ console.error(e); alert("Claim failed: " + (e && e.message ? e.message : e)); }
+  };
+
+  // ======== Withdraw ========
+  withdrawBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    const amount = withdrawInput.value;
+    if (!amount || isNaN(Number(amount))) return alert("Enter valid amount");
+    const unit = toUnits(amount);
+    try {
+      const tx = await stakingContract.withdrawPrincipal(unit);
+      await tx.wait();
+      alert("Withdraw confirmed");
+    } catch(e){ console.error(e); alert("Withdraw failed: " + (e && e.message ? e.message : e)); }
+  };
+
+  // ======== Check Staked Info (uses getUserInfo) ========
+  stakedBtn.onclick = async function(){
+    if (!isConnected) return alert("Connect wallet first");
+    try {
+      // use getUserInfo to avoid any storage ABI mismatch
+      const info = await stakingContract.getUserInfo(userAddress);
+      // returns: (staked, lastAction, referrer, totalEarned, pending)
+      const stakedBN = info[0];
+      const lastAction = info[1].toNumber ? info[1].toNumber() : Number(info[1]);
+      const referrer = info[2];
+      const totalEarnedBN = info[3];
+      const pendingBN = info[4];
+
+      const stakedDisplay = toDisplay(stakedBN);
+      const pendingDisplay = toDisplay(pendingBN);
+      const earnedDisplay = toDisplay(totalEarnedBN);
+      // Target 3x cap: need capX and compute target (capX * staked)
+      const capX = await stakingContract.capX();
+      const targetBN = stakedBN.mul(capX);
+      const targetDisplay = toDisplay(targetBN);
+
+      // Days to reach 3x: we can approximate by using ROI and simple math:
+      // yearly reward = staked * roiBP/10000
+      // days to reach (target - staked) in reward-only scenario:
+      const roiBP = await stakingContract.roiBP();
+      // if roiBP==0 avoid division by zero
+      let daysTo3x = "-";
+      if (roiBP.toString() !== "0" && stakedBN.gt(0)) {
+        const yearlyRewardBN = stakedBN.mul(roiBP).div(10000);
+        // delta to reach 3x by rewards only = target - staked
+        const delta = targetBN.sub(stakedBN);
+        // time (seconds) = delta * YEAR / yearlyReward
+        const YEAR = 365 * 24 * 3600;
+        if (yearlyRewardBN.gt(0)) {
+          const seconds = delta.mul(YEAR).div(yearlyRewardBN);
+          const days = Math.floor(Number(seconds) / (24*3600));
+          daysTo3x = days.toString() + " days";
+        } else daysTo3x = "∞";
+      }
+
+      stakedInfo.innerHTML = `
+        <div>Staked: <strong>${stakedDisplay} USDT</strong></div>
+        <div>Pending (calc): <strong>${pendingDisplay} USDT</strong></div>
+        <div>Total Earned (claimed+accrued): <strong>${earnedDisplay} USDT</strong></div>
+        <div>Target (3x cap): <strong>${targetDisplay} USDT</strong></div>
+        <div>Estimated days to 3x: <strong>${daysTo3x}</strong></div>
+        <div class="small muted">Referrer: ${referrer === ethers.constants.AddressZero ? '-' : referrer}</div>
+      `;
+    } catch (e) {
+      console.error(e);
+      alert("Error fetching staked info: " + (e && e.message ? e.message : e));
+    }
+  };
+
+  // Auto-attempt connect if already authorized
   try {
-    const addr = await signer.getAddress();
-    const rewards = await stakingContract.pendingRewards(addr);
-    document.getElementById("rewards").innerText = "Rewards: " + ethers.utils.formatUnits(rewards, 6) + " USDT";
-  } catch (err) {
-    alert("Error fetching rewards: " + err.message);
-  }
-}
+    if (window.ethereum && window.ethereum.selectedAddress) {
+      // optional auto-connect (comment out if not desired)
+      // await connectWallet();
+    }
+  } catch(e){ console.warn("Auto connect", e); }
 
-async function claimRewards() {
-  try {
-    const tx = await stakingContract.claimRewards();
-    await tx.wait();
-    alert("Rewards claimed ✅");
-  } catch (err) {
-    alert("Claim failed: " + err.message);
-  }
-}
+  // Prevent default enter submission on inputs
+  [amountInput, withdrawInput].forEach(inp => inp.addEventListener("keypress", (ev) => {
+    if (ev.key === "Enter") ev.preventDefault();
+  }));
 
-async function withdrawPrincipal() {
-  try {
-    const amount = document.getElementById("withdrawAmount").value;
-    const decimals = await tokenContract.decimals();
-    const tx = await stakingContract.withdrawPrincipal(ethers.utils.parseUnits(amount, decimals));
-    await tx.wait();
-    alert("Withdraw successful ✅");
-  } catch (err) {
-    alert("Withdraw failed: " + err.message);
-  }
-}
-
-async function checkStakedInfo() {
-  try {
-    const addr = await signer.getAddress();
-    const user = await stakingContract.users(addr);
-
-    // access struct safely (object or array)
-    const staked = ethers.utils.formatUnits(user.staked || user[0], 6);
-    const rewardDebt = ethers.utils.formatUnits(user.rewardDebt || user[1], 6);
-    const totalEarned = ethers.utils.formatUnits(user.totalEarned || user[4], 6);
-
-    document.getElementById("stakedInfo").innerText =
-      `Staked: ${staked} USDT | Reward Debt: ${rewardDebt} USDT | Total Earned: ${totalEarned} USDT`;
-  } catch (err) {
-    alert("Error fetching staked info: " + err.message);
-  }
-}
+  // Expose for debug (optional)
+  window._staking = { connectWallet, provider: () => provider, signer: () => signer, userAddress: () => userAddress };
+})();
 </script>
 </body>
 </html>
