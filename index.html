@@ -1,154 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🪙 USDT Staking — Pro Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-  <style>
-    body { background:#111; color:#fff; font-family:Arial; text-align:center; }
-    .card { background:#1e1e1e; padding:20px; margin:20px auto; width:400px; border-radius:12px; }
-    button { padding:10px 20px; border:none; border-radius:6px; margin:5px; cursor:pointer; }
-    .primary { background:#facc15; color:#000; }
-    .secondary { background:#333; color:#fff; }
-    .danger { background:#ef4444; color:#fff; }
-  </style>
+  <meta charset="UTF-8" />
+  <title>USDT Staking dApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
 </head>
 <body>
-  <h2>🪙 USDT Staking — Pro Dashboard</h2>
+  <h1>USDT Staking Platform</h1>
+  <button id="connectBtn">Connect Wallet</button>
+  <p id="walletAddress">Wallet: Not Connected</p>
 
-  <button id="connectBtn" class="primary" onclick="connectWallet()">🔗 Connect Wallet</button>
-  <p id="wallet-address">Wallet: not connected</p>
+  <h3>Your Balance</h3>
+  <button onclick="checkBalance()">Check Balance</button>
+  <p id="balance"></p>
 
-  <div class="card">
-    <h3>Approve & Stake</h3>
-    <input type="number" id="stakeAmount" placeholder="Amount (USDT)">
-    <button class="secondary" onclick="approve()">Approve</button>
-    <button class="primary" onclick="deposit()">Deposit</button>
-  </div>
+  <h3>Stake USDT</h3>
+  <input type="number" id="stakeAmount" placeholder="Amount (USDT)">
+  <button onclick="approve()">Approve</button>
+  <button onclick="deposit()">Deposit</button>
 
-  <div class="card">
-    <h3>Rewards</h3>
-    <button class="secondary" onclick="checkRewards()">Check Pending Rewards</button>
-    <p id="rewards">Rewards: 0 USDT</p>
-    <button class="primary" onclick="claimRewards()">Claim Rewards</button>
-  </div>
+  <h3>Rewards</h3>
+  <button onclick="checkPending()">Check Pending Rewards</button>
+  <p id="pending"></p>
+  <button onclick="claim()">Claim Rewards</button>
 
-  <div class="card">
-    <h3>Withdraw</h3>
-    <input type="number" id="withdrawAmount" placeholder="Amount (USDT)">
-    <button class="danger" onclick="withdrawPrincipal()">Withdraw</button>
-  </div>
+  <h3>Staked Balance</h3>
+  <button onclick="checkStaked()">Check Staked Balance</button>
+  <p id="staked"></p>
 
-  <div class="card">
-    <h3>📊 Staking Info</h3>
-    <button class="secondary" onclick="checkStaked()">Check Staked Balance</button>
-    <p id="staked">Staked: - USDT</p>
-    <p id="target">Target (3x cap): - USDT</p>
-    <p id="days">Days to reach 3x: - days</p>
-  </div>
+  <script>
+    // ---------------- CONFIG ----------------
+    const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407";
+    const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
 
-<script>
-let web3;
-let accounts;
+    const stakingAbi = [
+      {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawPrincipal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"pending","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"lockSeconds","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"minTx","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    ];
 
-// Contracts
-const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407";
-const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // same rahega
+    const tokenAbi = [
+      {"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"},
+      {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},
+      {"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+      {"constant":true,"inputs":[{"name":"owner","type":"address"},{"name":"spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"type":"function"}
+    ];
 
+    let provider, signer, stakingContract, tokenContract, userAddress;
 
-// ✅ Token ABI
-const tokenAbi = [
-  { "inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],
-    "name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-  { "inputs":[{"internalType":"address","name":"account","type":"address"}],
-    "name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}
-];
+    document.getElementById("connectBtn").onclick = async () => {
+      if (window.ethereum) {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        document.getElementById("walletAddress").innerText = "Wallet: " + userAddress;
+        stakingContract = new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
+        tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
+      } else {
+        alert("Install MetaMask!");
+      }
+    };
 
-// ✅ Staking ABI
-const stakingAbi = [
-  { "inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],
-    "name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  { "inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  { "inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],
-    "name":"withdrawPrincipal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  { "inputs":[{"internalType":"address","name":"userAddr","type":"address"}],
-    "name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  { "inputs":[{"internalType":"address","name":"","type":"address"}],
-    "name":"users","outputs":[
-      {"internalType":"uint256","name":"staked","type":"uint256"},
-      {"internalType":"uint256","name":"rewardDebt","type":"uint256"},
-      {"internalType":"uint256","name":"lastAction","type":"uint256"},
-      {"internalType":"address","name":"referrer","type":"address"},
-      {"internalType":"uint256","name":"totalEarned","type":"uint256"}
-    ],"stateMutability":"view","type":"function"}
-];
+    async function checkBalance() {
+      const bal = await tokenContract.balanceOf(userAddress);
+      document.getElementById("balance").innerText = "Balance: " + ethers.utils.formatUnits(bal, 6) + " USDT";
+    }
 
-let tokenContract, stakingContract;
+    async function approve() {
+      const amt = document.getElementById("stakeAmount").value;
+      const amount = ethers.utils.parseUnits(amt, 6);
+      const tx = await tokenContract.approve(STAKING_ADDRESS, amount);
+      await tx.wait();
+      alert("Approved " + amt + " USDT");
+    }
 
-// ✅ Connect Wallet
-async function connectWallet() {
-  if (typeof window.ethereum !== "undefined") {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    web3 = new Web3(window.ethereum);
-    accounts = await web3.eth.getAccounts();
-    document.getElementById("wallet-address").innerText = "Wallet: " + accounts[0];
-    tokenContract = new web3.eth.Contract(tokenAbi, TOKEN_ADDRESS);
-    stakingContract = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
-    console.log("Wallet connected:", accounts[0]);
-  } else {
-    alert("MetaMask not found!");
-  }
-}
+    async function deposit() {
+      const amt = document.getElementById("stakeAmount").value;
+      const amount = ethers.utils.parseUnits(amt, 6);
+      const tx = await stakingContract.deposit(amount, "0x0000000000000000000000000000000000000000");
+      await tx.wait();
+      alert("Deposited " + amt + " USDT");
+    }
 
-// ✅ Approve
-async function approve() {
-  let amount = document.getElementById("stakeAmount").value;
-  let decimals = await tokenContract.methods.decimals().call();
-  let value = web3.utils.toBN(amount).mul(web3.utils.toBN(10).pow(web3.utils.toBN(decimals)));
-  await tokenContract.methods.approve(STAKING_ADDRESS, value).send({ from: accounts[0] });
-  alert("Approved " + amount + " USDT for staking.");
-}
+    async function checkPending() {
+      const reward = await stakingContract.pendingRewards(userAddress);
+      document.getElementById("pending").innerText = "Pending Rewards: " + ethers.utils.formatUnits(reward, 6) + " USDT";
+    }
 
-// ✅ Deposit
-async function deposit() {
-  let amount = document.getElementById("stakeAmount").value;
-  let decimals = await tokenContract.methods.decimals().call();
-  let value = web3.utils.toBN(amount).mul(web3.utils.toBN(10).pow(web3.utils.toBN(decimals)));
-  await stakingContract.methods.deposit(value, "0x0000000000000000000000000000000000000000").send({ from: accounts[0] });
-  alert("Deposited " + amount + " USDT");
-}
+    async function claim() {
+      const tx = await stakingContract.claimRewards();
+      await tx.wait();
+      alert("Rewards Claimed!");
+    }
 
-// ✅ Rewards
-async function checkRewards() {
-  let rewards = await stakingContract.methods.pendingRewards(accounts[0]).call();
-  document.getElementById("rewards").innerText = "Rewards: " + (rewards/1e6) + " USDT";
-}
-async function claimRewards() {
-  await stakingContract.methods.claimRewards().send({ from: accounts[0] });
-  alert("Rewards claimed!");
-}
-
-// ✅ Withdraw
-async function withdrawPrincipal() {
-  let amount = document.getElementById("withdrawAmount").value;
-  let decimals = await tokenContract.methods.decimals().call();
-  let value = web3.utils.toBN(amount).mul(web3.utils.toBN(10).pow(web3.utils.toBN(decimals)));
-  await stakingContract.methods.withdrawPrincipal(value).send({ from: accounts[0] });
-  alert("Withdrawn " + amount + " USDT");
-}
-
-// ✅ Staking Info
-async function checkStaked() {
-  let user = await stakingContract.methods.users(accounts[0]).call();
-  let staked = user.staked / 1e6;
-  let target = staked * 3;
-  let days = Math.ceil((target - staked) / (staked * 0.00049)); // approx calc
-  document.getElementById("staked").innerText = "Staked: " + staked + " USDT";
-  document.getElementById("target").innerText = "Target (3x cap): " + target + " USDT";
-  document.getElementById("days").innerText = "Days to reach 3x: " + days + " days";
-}
-</script>
+    async function checkStaked() {
+      const info = await stakingContract.getUserInfo(userAddress);
+      document.getElementById("staked").innerText = "Staked: " + ethers.utils.formatUnits(info.staked, 6) + " USDT";
+    }
+  </script>
 </body>
 </html>
