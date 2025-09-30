@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin Panel - USDT Staking</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background:#f7f7f8; margin:20px; }
+  .card { background:#fff; padding:16px; border-radius:12px; margin:12px 0;
+          box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+  button { padding:10px 16px; border:none; border-radius:8px; cursor:pointer; margin-top:8px; }
+  input { padding:10px; border:1px solid #ccc; border-radius:8px; margin:4px 0; width:300px; }
+</style>
+</head>
+<body>
+  <h1>⚙️ Admin Panel (Owner Only)</h1>
+
+  <div class="card">
+    <button id="connectBtn">🔌 Connect Wallet</button>
+    <p><b>Account:</b> <span id="account">-</span></p>
+    <p><b>Status:</b> <span id="status">Not connected</span></p>
+  </div>
+
+  <div class="card" id="adminPanel" style="display:none;">
+    <h3>💰 Mint MockUSDT</h3>
+    <input id="mintTo" placeholder="Recipient address"/>
+    <input id="mintAmt" placeholder="Amount (USDT)"/>
+    <button id="mintBtn">Mint</button>
+
+    <h3>⚙️ Set Staking Params</h3>
+    <input id="roi" placeholder="18 (ROI %)" />
+    <input id="lock" placeholder="7776000 (3 months in sec)" />
+    <input id="cap" placeholder="3 (3x)" />
+    <input id="minTx" placeholder="1000000 (1 USDT in 6 decimals)" />
+    <button id="paramsBtn">Update Params</button>
+
+    <h3>📊 Contract Stats</h3>
+    <button id="statsBtn">Refresh Stats</button>
+    <p><b>Total Staked:</b> <span id="totalStaked">-</span> USDT</p>
+    <p><b>Total Paid Rewards:</b> <span id="totalRewards">-</span> USDT</p>
+    <p><b>Total Paid Referrals:</b> <span id="totalRefs">-</span> USDT</p>
+    <p><b>Active Users:</b> <span id="activeUsers">-</span></p>
+  </div>
+
+<script>
+// ==== CONFIG ====
+// 👇 Apne actual deployed addresses yahan dalna
+const STAKING_ADDRESS = "0x71E78A6621A3Af5B7A6B7f24257032c2D1d30F7f";
+const TOKEN_ADDRESS   = "0x8B953059f82F4C5B68E3Ec978F5559588fD2972D";
+const DEC = 6;
+
+// ==== ABIs ====
+// Staking contract ABI
+const STAKING_ABI = [
+  "function setParams(uint256,uint256,uint256,uint256)",
+  "function totalStaked() view returns (uint256)",
+  "function totalPaidRewards() view returns (uint256)",
+  "function totalPaidReferrals() view returns (uint256)",
+  "function activeUsers() view returns (uint256)"
+];
+
+// MockUSDT ABI
+const ERC20_ABI = [
+  "function mint(address,uint256)",
+  "function owner() view returns (address)"
+];
+
+// ==== Globals ====
+let provider, signer, account, staking, usdt;
+
+// ==== Helpers ====
+const $ = id => document.getElementById(id);
+const parse = (x, d=DEC)=> ethers.utils.parseUnits(String(x||"0"), d);
+function setStatus(msg){ $("status").textContent = msg; }
+
+// ==== Connect ====
+async function connect(){
+  if(!window.ethereum){ alert("MetaMask not found"); return; }
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    signer   = provider.getSigner();
+    account  = await signer.getAddress();
+    staking  = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+    usdt     = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
+
+    $("account").textContent = account;
+    setStatus("Connected ✔");
+
+    await checkOwner();
+  } catch(e){ console.error(e); setStatus("Connect failed: "+e.message); }
+}
+
+// ==== Owner Check ====
+async function checkOwner(){
+  try {
+    const owner = await usdt.owner();
+    if(owner.toLowerCase() === account.toLowerCase()){
+      $("adminPanel").style.display = "block";
+      setStatus("Owner verified ✔ Admin panel unlocked");
+    } else {
+      setStatus("Not contract owner ❌");
+    }
+  } catch(e){ console.error(e); setStatus("Owner check failed"); }
+}
+
+// ==== Mint ====
+async function mintTokens(){
+  try {
+    const to = $("mintTo").value;
+    const amt = parse($("mintAmt").value);
+    const tx = await usdt.mint(to, amt);
+    await tx.wait();
+    setStatus("Mint successful ✔");
+  } catch(e){ console.error(e); setStatus("Mint failed: "+e.message); }
+}
+
+// ==== Params ====
+async function updateParams(){
+  try {
+    const roi  = $("roi").value || "18";
+    const lock = $("lock").value || "7776000"; // 90 days
+    const cap  = $("cap").value || "3";
+    const minT = $("minTx").value || "1000000"; // 1 USDT
+
+    const tx = await staking.setParams(roi, lock, cap, minT);
+    await tx.wait();
+    setStatus("Params updated ✔");
+  } catch(e){ console.error(e); setStatus("Params update failed: "+e.message); }
+}
+
+// ==== Stats ====
+async function loadStats(){
+  try {
+    const staked  = await staking.totalStaked();
+    const rewards = await staking.totalPaidRewards();
+    const refs    = await staking.totalPaidReferrals();
+    const users   = await staking.activeUsers();
+
+    $("totalStaked").textContent  = ethers.utils.formatUnits(staked, DEC);
+    $("totalRewards").textContent = ethers.utils.formatUnits(rewards, DEC);
+    $("totalRefs").textContent    = ethers.utils.formatUnits(refs, DEC);
+    $("activeUsers").textContent  = users.toString();
+
+    setStatus("Stats refreshed ✔");
+  } catch(e){
+    console.error(e);
+    setStatus("Stats load failed: " + e.message);
+  }
+}
+
+// ==== Bindings ====
+$("connectBtn").onclick = connect;
+$("mintBtn").onclick    = mintTokens;
+$("paramsBtn").onclick  = updateParams;
+$("statsBtn").onclick   = loadStats;
+</script>
+</body>
+</html>
