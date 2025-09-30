@@ -146,34 +146,46 @@ async function ensureBscTestnet(){
   }
 }
 
-async function connect(){
-  if(!window.ethereum){ alert("Install MetaMask / open in a wallet dApp browser"); return; }
-  setStatus("Connecting...");
-  await ensureBscTestnet();
-provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = await provider.getSigner();
-  account = await signer.getAddress();
-
-  staking = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-  usdt    = new ethers.Contract(TOKEN_ADDRESS,   ERC20_ABI,   signer);
-  try { dec = await usdt.decimals(); } catch(_) { dec = 6; }
-
-  $("account").textContent = account;
-  $("network").textContent = "BSC Testnet (97)";
-  $("stakingAddr").textContent = STAKING_ADDRESS;
-  $("tokenAddr").textContent = TOKEN_ADDRESS;
-  $("decimals").textContent = dec;
-
-  // Prefill ref from URL (?ref=0x...)
+async function connect() {
+  if (typeof window.ethereum === 'undefined') {
+    alert("MetaMask not found. Install or enable it.");
+    return;
+  }
   try {
-    const u = new URL(window.location.href);
-    const r = u.searchParams.get("ref");
-    if(r) $("refAddr").value = r;
-  } catch {}
+    // Force user to select account
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
 
-  await refresh();
-  setStatus("Connected ✔", "ok");
+    // Provider & signer (ethers v5)
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    signer   = provider.getSigner();
+    account  = await signer.getAddress();
+
+    // Contract instances
+    staking = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+    usdt    = new ethers.Contract(TOKEN_ADDRESS,   ERC20_ABI,   signer);
+
+    // UI update
+    $("account").textContent = account;
+    $("network").textContent = "BSC Testnet (97)";
+    $("stakingAddr").textContent = STAKING_ADDRESS;
+    $("tokenAddr").textContent = TOKEN_ADDRESS;
+    $("decimals").textContent = dec;
+
+    // Prefill referral if any
+    try {
+      const u = new URL(window.location.href);
+      const r = u.searchParams.get("ref");
+      if(r) $("refAddr").value = r;
+    } catch {}
+
+    // First refresh after connect
+    await refresh();
+
+    setStatus("Connected ✔", "ok");
+  } catch (err) {
+    console.error("Connect error:", err);
+    alert("Connection failed: " + (err.message || err));
+  }
 }
 
 async function refresh(){
