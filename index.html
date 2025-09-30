@@ -199,17 +199,25 @@ async function refresh(){
 }
 
 async function approve(){
-  try{
+  try {
     setStatus("Approving...");
+
     const amtStr = $("depAmt").value || "0";
     const units = parse(amtStr);
+
+    // ✅ USDT token contract pe approve call
     const tx = await usdt.approve(STAKING_ADDRESS, units);
     await tx.wait();
+
     await refresh();
     setStatus("Approve successful ✔", "ok");
     alert("Approved!");
-  }catch(e){
-    console.error(e); setStatus("Approve failed", "err"); alert("Approve failed: " + (e.info?.error?.message || e.message));
+  } catch(e) {
+    console.error(e);
+    setStatus("Approve failed", "err");
+    alert("Approve failed: " + (e.reason || e.message));
+  }
+}
   }
 }
 
