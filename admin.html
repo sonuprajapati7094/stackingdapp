@@ -1,135 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>⚙️ Admin Panel - USDT Staking</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <meta charset="utf-8" />
+  <title>Admin Panel — USDT Staking</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Ethers v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body { background:#0d0d0d; color:#fff; font-family:Arial; text-align:center; }
-    .card { background:#1e1e1e; padding:20px; margin:20px auto; width:500px; border-radius:12px; }
-    button { padding:10px 20px; border:none; border-radius:6px; margin:5px; cursor:pointer; }
-    .primary { background:#facc15; color:#000; }
-    .secondary { background:#333; color:#fff; }
-    .danger { background:#ef4444; color:#fff; }
-    input { padding:8px; margin:5px; width:80%; border-radius:6px; border:none; text-align:center; }
+    body{background:#0c0c0f;color:#fff;font-family:Inter,system-ui,Arial;margin:0;padding:30px;display:flex;flex-direction:column;align-items:center}
+    h1{margin:0 0 20px;font-size:26px}
+    .card{background:#18181b;padding:20px;border-radius:12px;margin:14px 0;box-shadow:0 6px 20px rgba(0,0,0,0.45);width:500px;max-width:95%}
+    button{cursor:pointer;border:0;padding:10px 16px;border-radius:8px;font-weight:600}
+    .btn-yellow{background:#ffc629;color:#111}
+    .btn-dark{background:#2a2a2e;color:#fff}
+    input{padding:10px;border-radius:8px;border:0;background:#2a2a2e;color:#fff;width:180px}
+    .muted{color:#aaa;font-size:14px}
   </style>
 </head>
 <body>
-  <h2>⚙️ USDT Staking — Admin Panel</h2>
-
-  <button id="connectBtn" class="primary" onclick="connectWallet()">🔗 Connect Wallet</button>
-  <p id="wallet-address">Wallet: not connected</p>
+  <h1>⚙️ Admin Panel — USDT Staking</h1>
+  <div id="walletText" class="muted">Wallet: not connected</div>
+  <div style="margin:16px"><button id="connectBtn" class="btn-yellow">Connect Wallet</button></div>
 
   <div class="card">
-    <h3>Contract Info</h3>
-    <p id="owner">Owner: -</p>
-    <p id="roi">ROI (basis points): -</p>
-    <p id="lock">Lock Period: - days</p>
-    <p id="minTx">Minimum TX: - USDT</p>
-    <p id="capx">CapX (max 3x): -</p>
-    <p id="totalStaked">Total Staked: - USDT</p>
-    <p id="totalRewards">Total Rewards: - USDT</p>
-    <button class="secondary" onclick="loadInfo()">🔄 Refresh Info</button>
+    <h3>📊 Contract Stats</h3>
+    <div id="stats">-</div>
+    <button class="btn-dark" id="refreshBtn">Refresh Stats</button>
   </div>
 
   <div class="card">
-    <h3>Update Params</h3>
-    <input id="roiInput" type="number" placeholder="ROI (basis points)">
-    <input id="lockInput" type="number" placeholder="Lock Period (seconds)">
-    <input id="minTxInput" type="number" placeholder="Min TX (USDT)">
-    <input id="capxInput" type="number" placeholder="CapX multiplier">
-    <button class="primary" onclick="setParams()">⚡ Update Params</button>
+    <h3>🔧 Update Parameters</h3>
+    <div class="muted">ROI (basis points), Lock (sec), MinTx (USDT), CapX</div>
+    <input id="roiInput" placeholder="ROI BP (e.g. 1800)" /><br><br>
+    <input id="lockInput" placeholder="Lock (sec)" /><br><br>
+    <input id="minTxInput" placeholder="MinTx (USDT)" /><br><br>
+    <input id="capXInput" placeholder="CapX (e.g. 3)" /><br><br>
+    <button class="btn-yellow" id="setParamsBtn">Update Params</button>
+  </div>
+
+  <div class="card">
+    <h3>🚨 Emergency Withdraw</h3>
+    <input id="toInput" placeholder="To address" /><br><br>
+    <input id="amtInput" placeholder="Amount (USDT)" /><br><br>
+    <button class="btn-dark" id="emergencyBtn">Withdraw</button>
+  </div>
+
+  <div class="card">
+    <h3>👑 Ownership</h3>
+    <input id="newOwnerInput" placeholder="New Owner Address" /><br><br>
+    <button class="btn-yellow" id="transferBtn">Transfer Ownership</button>
   </div>
 
 <script>
-let web3;
-let accounts;
+(async function(){
+  const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407"; 
+  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; 
 
-const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407";
-const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // same rahega
+  const stakingAbi = [
+    "function owner() view returns (address)",
+    "function roiBP() view returns (uint256)",
+    "function lockSeconds() view returns (uint256)",
+    "function minTx() view returns (uint256)",
+    "function capX() view returns (uint256)",
+    "function totalStaked() view returns (uint256)",
+    "function totalRewards() view returns (uint256)",
+    "function setParams(uint256,uint256,uint256,uint256)",
+    "function emergencyWithdraw(address,uint256)",
+    "function transferOwnership(address)"
+  ];
 
+  const tokenAbi = [
+    "function decimals() view returns (uint8)"
+  ];
 
-// ✅ Staking ABI (Admin functions included)
-const stakingAbi = [
-  { "inputs":[],"stateMutability":"nonpayable","type":"constructor" },
-  { "inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"lockSeconds","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"minTx","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"},
-  { "inputs":[
-      {"internalType":"uint256","name":"_roiBP","type":"uint256"},
-      {"internalType":"uint256","name":"_lockSeconds","type":"uint256"},
-      {"internalType":"uint256","name":"_minTx","type":"uint256"},
-      {"internalType":"uint256","name":"_capX","type":"uint256"}
-    ],
-    "name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"}
-];
+  let provider, signer, userAddress, staking, token, decimals=6, contractOwner;
 
-let stakingContract;
+  const connectBtn=document.getElementById("connectBtn");
+  const walletText=document.getElementById("walletText");
+  const refreshBtn=document.getElementById("refreshBtn");
+  const stats=document.getElementById("stats");
 
-// ✅ Connect Wallet
-async function connectWallet() {
-  if (typeof window.ethereum !== "undefined") {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    web3 = new Web3(window.ethereum);
-    accounts = await web3.eth.getAccounts();
-    document.getElementById("wallet-address").innerText = "Wallet: " + accounts[0];
-    stakingContract = new web3.eth.Contract(stakingAbi, STAKING_ADDRESS);
-    loadInfo();
-  } else {
-    alert("MetaMask not found!");
+  async function connect(){
+    provider=new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    signer=provider.getSigner();
+    userAddress=await signer.getAddress();
+    staking=new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
+    token=new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
+    decimals=await token.decimals();
+    contractOwner=await staking.owner();
+
+    walletText.textContent="Wallet: "+userAddress+(userAddress.toLowerCase()==contractOwner.toLowerCase()?" (OWNER)":" (User)");
+    connectBtn.textContent="Connected";
   }
-}
+  connectBtn.onclick=connect;
 
-// ✅ Load contract info
-async function loadInfo() {
-  const owner = await stakingContract.methods.owner().call();
-  const roi = await stakingContract.methods.roiBP().call();
-  const lock = await stakingContract.methods.lockSeconds().call();
-  const minTx = await stakingContract.methods.minTx().call();
-  const capx = await stakingContract.methods.capX().call();
-  const totalStaked = await stakingContract.methods.totalStaked().call();
-  const totalRewards = await stakingContract.methods.totalRewards().call();
+  function fmt(bn){return ethers.utils.formatUnits(bn,decimals);}
+  function toUnits(v){return ethers.utils.parseUnits(v||"0",decimals);}
 
-  document.getElementById("owner").innerText = "Owner: " + owner;
-  document.getElementById("roi").innerText = "ROI (basis points): " + roi;
-  document.getElementById("lock").innerText = "Lock Period: " + (lock/86400) + " days";
-  document.getElementById("minTx").innerText = "Minimum TX: " + (minTx/1e6) + " USDT";
-  document.getElementById("capx").innerText = "CapX (max): " + capx;
-  document.getElementById("totalStaked").innerText = "Total Staked: " + (totalStaked/1e6) + " USDT";
-  document.getElementById("totalRewards").innerText = "Total Rewards: " + (totalRewards/1e6) + " USDT";
-}
+  refreshBtn.onclick=async()=>{
+    const roi=await staking.roiBP();
+    const lock=await staking.lockSeconds();
+    const minTx=await staking.minTx();
+    const cap=await staking.capX();
+    const totalSt=await staking.totalStaked();
+    const totalRw=await staking.totalRewards();
+    stats.innerHTML=`
+      Owner: ${contractOwner}<br>
+      ROI: ${roi} BP (~${roi/100}%/yr)<br>
+      Lock: ${lock} sec<br>
+      MinTx: ${fmt(minTx)} USDT<br>
+      CapX: ${cap}x<br>
+      Total Staked: ${fmt(totalSt)} USDT<br>
+      Total Rewards: ${fmt(totalRw)} USDT
+    `;
+  };
 
-// ✅ Update Params
-async function setParams() {
-  let roi = document.getElementById("roiInput").value;
-  let lock = document.getElementById("lockInput").value;
-  let minTx = document.getElementById("minTxInput").value;
-  let capx = document.getElementById("capxInput").value;
+  document.getElementById("setParamsBtn").onclick=async()=>{
+    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
+    const roi=document.getElementById("roiInput").value;
+    const lock=document.getElementById("lockInput").value;
+    const minTx=toUnits(document.getElementById("minTxInput").value);
+    const cap=document.getElementById("capXInput").value;
+    const tx=await staking.setParams(roi,lock,minTx,cap);
+    await tx.wait();
+    alert("Params updated");
+  };
 
-  if(!roi || !lock || !minTx || !capx) {
-    alert("Please fill all fields!");
-    return;
-  }
+  document.getElementById("emergencyBtn").onclick=async()=>{
+    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
+    const to=document.getElementById("toInput").value;
+    const amt=toUnits(document.getElementById("amtInput").value);
+    const tx=await staking.emergencyWithdraw(to,amt);
+    await tx.wait();
+    alert("Emergency withdraw done");
+  };
 
-  await stakingContract.methods
-    .setParams(roi, lock, minTx*1e6, capx)
-    .send({ from: accounts[0] });
-
-  alert("Params updated successfully!");
-  loadInfo();
-}
+  document.getElementById("transferBtn").onclick=async()=>{
+    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
+    const newO=document.getElementById("newOwnerInput").value;
+    const tx=await staking.transferOwnership(newO);
+    await tx.wait();
+    alert("Ownership transferred");
+  };
+})();
 </script>
 </body>
 </html>
