@@ -1,149 +1,174 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Admin Panel — USDT Staking</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Ethers v5 -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚙️ Admin Panel - USDT Staking</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body{background:#0c0c0f;color:#fff;font-family:Inter,system-ui,Arial;margin:0;padding:30px;display:flex;flex-direction:column;align-items:center}
-    h1{margin:0 0 20px;font-size:26px}
-    .card{background:#18181b;padding:20px;border-radius:12px;margin:14px 0;box-shadow:0 6px 20px rgba(0,0,0,0.45);width:500px;max-width:95%}
-    button{cursor:pointer;border:0;padding:10px 16px;border-radius:8px;font-weight:600}
-    .btn-yellow{background:#ffc629;color:#111}
-    .btn-dark{background:#2a2a2e;color:#fff}
-    input{padding:10px;border-radius:8px;border:0;background:#2a2a2e;color:#fff;width:180px}
-    .muted{color:#aaa;font-size:14px}
+    body {
+      font-family: Arial, sans-serif;
+      background: #0d0d0d;
+      color: white;
+      text-align: center;
+    }
+    h1 { margin-top: 20px; }
+    .card {
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 450px;
+      box-shadow: 0px 0px 10px rgba(255,255,255,0.1);
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .primary { background: gold; color: black; }
+    .danger { background: crimson; color: white; }
+    .secondary { background: #333; color: white; }
+    input {
+      padding: 10px;
+      margin: 5px;
+      width: 90%;
+      border-radius: 8px;
+      border: none;
+      text-align: center;
+    }
+    .status { margin-top: 10px; font-size: 14px; color: gray; }
   </style>
 </head>
 <body>
   <h1>⚙️ Admin Panel — USDT Staking</h1>
-  <div id="walletText" class="muted">Wallet: not connected</div>
-  <div style="margin:16px"><button id="connectBtn" class="btn-yellow">Connect Wallet</button></div>
+  <button id="connectBtn" class="primary">🔗 Connect Wallet</button>
+  <p id="walletStatus">Wallet: not connected</p>
 
+  <!-- Stats -->
   <div class="card">
-    <h3>📊 Contract Stats</h3>
-    <div id="stats">-</div>
-    <button class="btn-dark" id="refreshBtn">Refresh Stats</button>
+    <h2>📊 Contract Stats</h2>
+    <button id="checkStatsBtn" class="secondary">Check Stats</button>
+    <p id="statsInfo">-</p>
   </div>
 
+  <!-- Update Params -->
   <div class="card">
-    <h3>🔧 Update Parameters</h3>
-    <div class="muted">ROI (basis points), Lock (sec), MinTx (USDT), CapX</div>
-    <input id="roiInput" placeholder="ROI BP (e.g. 1800)" /><br><br>
-    <input id="lockInput" placeholder="Lock (sec)" /><br><br>
-    <input id="minTxInput" placeholder="MinTx (USDT)" /><br><br>
-    <input id="capXInput" placeholder="CapX (e.g. 3)" /><br><br>
-    <button class="btn-yellow" id="setParamsBtn">Update Params</button>
+    <h2>🔧 Update Parameters</h2>
+    <input id="roi" placeholder="ROI Basis Points (1800=18%)">
+    <input id="lock" placeholder="Lock Period (seconds)">
+    <input id="minTx" placeholder="Min Stake (smallest units)">
+    <input id="capX" placeholder="Cap Multiplier (3x)">
+    <button id="setParamsBtn" class="primary">Update Params</button>
   </div>
 
+  <!-- Emergency Withdraw -->
   <div class="card">
-    <h3>🚨 Emergency Withdraw</h3>
-    <input id="toInput" placeholder="To address" /><br><br>
-    <input id="amtInput" placeholder="Amount (USDT)" /><br><br>
-    <button class="btn-dark" id="emergencyBtn">Withdraw</button>
+    <h2>🚨 Emergency Withdraw</h2>
+    <input id="toAddr" placeholder="To Address">
+    <input id="amount" placeholder="Amount (USDT)">
+    <button id="emergencyBtn" class="danger">Withdraw</button>
   </div>
 
+  <!-- Transfer Ownership -->
   <div class="card">
-    <h3>👑 Ownership</h3>
-    <input id="newOwnerInput" placeholder="New Owner Address" /><br><br>
-    <button class="btn-yellow" id="transferBtn">Transfer Ownership</button>
+    <h2>👑 Transfer Ownership</h2>
+    <input id="newOwner" placeholder="New Owner Address">
+    <button id="transferOwnerBtn" class="primary">Transfer Ownership</button>
   </div>
 
-<script>
-(async function(){
-  const STAKING_ADDRESS = "0x20Fbd4AF3cB507e702C7C513F08D7857bAc74407"; 
-  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; 
+  <p class="status" id="status"></p>
 
-  const stakingAbi = [
-    "function owner() view returns (address)",
-    "function roiBP() view returns (uint256)",
-    "function lockSeconds() view returns (uint256)",
-    "function minTx() view returns (uint256)",
-    "function capX() view returns (uint256)",
-    "function totalStaked() view returns (uint256)",
-    "function totalRewards() view returns (uint256)",
-    "function setParams(uint256,uint256,uint256,uint256)",
-    "function emergencyWithdraw(address,uint256)",
-    "function transferOwnership(address)"
-  ];
+  <script>
+    const stakingAddress = "0xC762eA92B653aCc0C752C90AD44e026980551c60";
+    const tokenAddress = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
+    const stakingABI = [
+      "function roiBP() view returns(uint256)",
+      "function lockSeconds() view returns(uint256)",
+      "function minTx() view returns(uint256)",
+      "function capX() view returns(uint256)",
+      "function totalStaked() view returns(uint256)",
+      "function totalRewards() view returns(uint256)",
+      "function owner() view returns(address)",
+      "function setParams(uint256,uint256,uint256,uint256) external",
+      "function emergencyWithdraw(address to, uint256 amount) external",
+      "function transferOwnership(address newOwner) external"
+    ];
 
-  const tokenAbi = [
-    "function decimals() view returns (uint8)"
-  ];
+    let provider, signer, staking, userAddress;
 
-  let provider, signer, userAddress, staking, token, decimals=6, contractOwner;
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) throw new Error("MetaMask not found");
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        staking = new ethers.Contract(stakingAddress, stakingABI, signer);
+        document.getElementById("walletStatus").innerText = "Wallet: " + userAddress;
+        document.getElementById("status").innerText = "Connected ✅";
+      } catch (err) {
+        alert("Wallet connect failed: " + err.message);
+      }
+    }
 
-  const connectBtn=document.getElementById("connectBtn");
-  const walletText=document.getElementById("walletText");
-  const refreshBtn=document.getElementById("refreshBtn");
-  const stats=document.getElementById("stats");
+    async function checkStats() {
+      try {
+        const roi = await staking.roiBP();
+        const lock = await staking.lockSeconds();
+        const minTx = await staking.minTx();
+        const capX = await staking.capX();
+        const staked = await staking.totalStaked();
+        const rewards = await staking.totalRewards();
+        const owner = await staking.owner();
 
-  async function connect(){
-    provider=new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
-    signer=provider.getSigner();
-    userAddress=await signer.getAddress();
-    staking=new ethers.Contract(STAKING_ADDRESS, stakingAbi, signer);
-    token=new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
-    decimals=await token.decimals();
-    contractOwner=await staking.owner();
+        document.getElementById("statsInfo").innerText =
+          `ROI: ${roi} BP | Lock: ${lock} sec | MinTx: ${minTx} | CapX: ${capX}\n` +
+          `Total Staked: ${(staked/1e6).toFixed(2)} USDT | Total Rewards: ${(rewards/1e6).toFixed(2)} USDT\n` +
+          `Owner: ${owner}`;
+      } catch (err) { alert("Check stats failed: " + err.message); }
+    }
 
-    walletText.textContent="Wallet: "+userAddress+(userAddress.toLowerCase()==contractOwner.toLowerCase()?" (OWNER)":" (User)");
-    connectBtn.textContent="Connected";
-  }
-  connectBtn.onclick=connect;
+    async function setParams() {
+      try {
+        const roi = document.getElementById("roi").value;
+        const lock = document.getElementById("lock").value;
+        const minTx = document.getElementById("minTx").value;
+        const capX = document.getElementById("capX").value;
+        let tx = await staking.setParams(roi, lock, minTx, capX);
+        await tx.wait();
+        document.getElementById("status").innerText = "Params updated ✅";
+      } catch (err) { alert("Set params failed: " + err.message); }
+    }
 
-  function fmt(bn){return ethers.utils.formatUnits(bn,decimals);}
-  function toUnits(v){return ethers.utils.parseUnits(v||"0",decimals);}
+    async function emergencyWithdraw() {
+      try {
+        const to = document.getElementById("toAddr").value;
+        const amount = ethers.utils.parseUnits(document.getElementById("amount").value, 6);
+        let tx = await staking.emergencyWithdraw(to, amount);
+        await tx.wait();
+        document.getElementById("status").innerText = "Emergency Withdraw ✅";
+      } catch (err) { alert("Emergency withdraw failed: " + err.message); }
+    }
 
-  refreshBtn.onclick=async()=>{
-    const roi=await staking.roiBP();
-    const lock=await staking.lockSeconds();
-    const minTx=await staking.minTx();
-    const cap=await staking.capX();
-    const totalSt=await staking.totalStaked();
-    const totalRw=await staking.totalRewards();
-    stats.innerHTML=`
-      Owner: ${contractOwner}<br>
-      ROI: ${roi} BP (~${roi/100}%/yr)<br>
-      Lock: ${lock} sec<br>
-      MinTx: ${fmt(minTx)} USDT<br>
-      CapX: ${cap}x<br>
-      Total Staked: ${fmt(totalSt)} USDT<br>
-      Total Rewards: ${fmt(totalRw)} USDT
-    `;
-  };
+    async function transferOwnership() {
+      try {
+        const newOwner = document.getElementById("newOwner").value;
+        let tx = await staking.transferOwnership(newOwner);
+        await tx.wait();
+        document.getElementById("status").innerText = "Ownership Transferred ✅";
+      } catch (err) { alert("Transfer failed: " + err.message); }
+    }
 
-  document.getElementById("setParamsBtn").onclick=async()=>{
-    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
-    const roi=document.getElementById("roiInput").value;
-    const lock=document.getElementById("lockInput").value;
-    const minTx=toUnits(document.getElementById("minTxInput").value);
-    const cap=document.getElementById("capXInput").value;
-    const tx=await staking.setParams(roi,lock,minTx,cap);
-    await tx.wait();
-    alert("Params updated");
-  };
-
-  document.getElementById("emergencyBtn").onclick=async()=>{
-    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
-    const to=document.getElementById("toInput").value;
-    const amt=toUnits(document.getElementById("amtInput").value);
-    const tx=await staking.emergencyWithdraw(to,amt);
-    await tx.wait();
-    alert("Emergency withdraw done");
-  };
-
-  document.getElementById("transferBtn").onclick=async()=>{
-    if(userAddress.toLowerCase()!=contractOwner.toLowerCase()){alert("Not owner!");return;}
-    const newO=document.getElementById("newOwnerInput").value;
-    const tx=await staking.transferOwnership(newO);
-    await tx.wait();
-    alert("Ownership transferred");
-  };
-})();
-</script>
+    // Bindings
+    document.getElementById("connectBtn").onclick = connectWallet;
+    document.getElementById("checkStatsBtn").onclick = checkStats;
+    document.getElementById("setParamsBtn").onclick = setParams;
+    document.getElementById("emergencyBtn").onclick = emergencyWithdraw;
+    document.getElementById("transferOwnerBtn").onclick = transferOwnership;
+  </script>
 </body>
 </html>
