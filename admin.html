@@ -2,173 +2,202 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>⚙️ Admin Panel - USDT Staking</title>
+  <title>Admin Panel - USDT Staking</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #0d0d0d;
-      color: white;
-      text-align: center;
+      background-color: #0d1117;
+      color: #e6edf3;
+      margin: 0;
+      padding: 0;
     }
-    h1 { margin-top: 20px; }
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: 40px auto;
+    }
     .card {
-      background: #1a1a1a;
+      background: #161b22;
+      border: 1px solid #30363d;
       border-radius: 12px;
       padding: 20px;
-      margin: 20px auto;
-      width: 450px;
-      box-shadow: 0px 0px 10px rgba(255,255,255,0.1);
+      margin-bottom: 20px;
+      box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+    }
+    h1, h2, h3 {
+      color: #f78166;
     }
     button {
+      background: #8957e5;
+      color: #fff;
+      border: none;
       padding: 10px 20px;
-      margin: 5px;
-      border: none;
       border-radius: 8px;
-      font-weight: bold;
       cursor: pointer;
+      font-size: 14px;
+      margin-top: 10px;
     }
-    .primary { background: gold; color: black; }
-    .danger { background: crimson; color: white; }
-    .secondary { background: #333; color: white; }
+    button:hover {
+      background: #a371f7;
+    }
     input {
-      padding: 10px;
-      margin: 5px;
-      width: 90%;
+      padding: 8px;
       border-radius: 8px;
-      border: none;
-      text-align: center;
+      border: 1px solid #30363d;
+      margin: 5px 0;
+      width: 100%;
+      background: #0d1117;
+      color: #e6edf3;
     }
-    .status { margin-top: 10px; font-size: 14px; color: gray; }
+    .info {
+      margin: 10px 0;
+      padding: 10px;
+      background: #21262d;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
-  <h1>⚙️ Admin Panel — USDT Staking</h1>
-  <button id="connectBtn" class="primary">🔗 Connect Wallet</button>
-  <p id="walletStatus">Wallet: not connected</p>
+  <div class="container">
+    <h1>Admin Panel - USDT Staking</h1>
 
-  <!-- Stats -->
-  <div class="card">
-    <h2>📊 Contract Stats</h2>
-    <button id="checkStatsBtn" class="secondary">Check Stats</button>
-    <p id="statsInfo">-</p>
+    <div class="card">
+      <h3>Wallet</h3>
+      <button onclick="connectWallet()">Connect Admin Wallet</button>
+      <p id="walletAddress">Not connected</p>
+      <p id="isOwner">Checking ownership...</p>
+    </div>
+
+    <div class="card">
+      <h3>Global Stats</h3>
+      <button onclick="loadStats()">Load Stats</button>
+      <div id="stats"></div>
+    </div>
+
+    <div class="card">
+      <h3>Update Parameters</h3>
+      <input id="roi" placeholder="ROI (Basis Points)">
+      <input id="lock" placeholder="Lock Period (seconds)">
+      <input id="minTx" placeholder="Minimum Tx (in smallest unit)">
+      <input id="capX" placeholder="Cap Multiplier (e.g. 3)">
+      <button onclick="updateParams()">Update Params</button>
+    </div>
+
+    <div class="card">
+      <h3>Emergency Withdraw</h3>
+      <input id="to" placeholder="To Address">
+      <input id="amt" placeholder="Amount (USDT)">
+      <button onclick="emergencyWithdraw()">Withdraw</button>
+    </div>
+
+    <div class="card">
+      <h3>Transfer Ownership</h3>
+      <input id="newOwner" placeholder="New Owner Address">
+      <button onclick="transferOwnership()">Transfer</button>
+    </div>
+
+    <!-- REFERRAL MONITOR -->
+    <div class="card">
+      <h3>Referral Monitor</h3>
+      <input id="checkUser" placeholder="User Wallet Address">
+      <button onclick="getUserInfo()">Check User Info</button>
+      <div id="userData"></div>
+    </div>
   </div>
-
-  <!-- Update Params -->
-  <div class="card">
-    <h2>🔧 Update Parameters</h2>
-    <input id="roi" placeholder="ROI Basis Points (1800=18%)">
-    <input id="lock" placeholder="Lock Period (seconds)">
-    <input id="minTx" placeholder="Min Stake (smallest units)">
-    <input id="capX" placeholder="Cap Multiplier (3x)">
-    <button id="setParamsBtn" class="primary">Update Params</button>
-  </div>
-
-  <!-- Emergency Withdraw -->
-  <div class="card">
-    <h2>🚨 Emergency Withdraw</h2>
-    <input id="toAddr" placeholder="To Address">
-    <input id="amount" placeholder="Amount (USDT)">
-    <button id="emergencyBtn" class="danger">Withdraw</button>
-  </div>
-
-  <!-- Transfer Ownership -->
-  <div class="card">
-    <h2>👑 Transfer Ownership</h2>
-    <input id="newOwner" placeholder="New Owner Address">
-    <button id="transferOwnerBtn" class="primary">Transfer Ownership</button>
-  </div>
-
-  <p class="status" id="status"></p>
 
   <script>
-    const stakingAddress = "0xC762eA92B653aCc0C752C90AD44e026980551c60";
-  
+    const tokenAddress = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // ✅ USDT Token
+    const stakingAddress = "0xC762eA92B653aCc0C752C90AD44e026980551c60"; // ✅ Staking Contract
+
     const stakingABI = [
-      "function roiBP() view returns(uint256)",
-      "function lockSeconds() view returns(uint256)",
-      "function minTx() view returns(uint256)",
-      "function capX() view returns(uint256)",
-      "function totalStaked() view returns(uint256)",
-      "function totalRewards() view returns(uint256)",
-      "function owner() view returns(address)",
-      "function setParams(uint256,uint256,uint256,uint256) external",
-      "function emergencyWithdraw(address to, uint256 amount) external",
-      "function transferOwnership(address newOwner) external"
+      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[
+        {"internalType":"uint256","name":"staked","type":"uint256"},
+        {"internalType":"uint256","name":"lastAction","type":"uint256"},
+        {"internalType":"address","name":"referrer","type":"address"},
+        {"internalType":"uint256","name":"totalEarned","type":"uint256"},
+        {"internalType":"uint256","name":"pending","type":"uint256"}
+      ],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"_roiBP","type":"uint256"},{"internalType":"uint256","name":"_lockSeconds","type":"uint256"},{"internalType":"uint256","name":"_minTx","type":"uint256"},{"internalType":"uint256","name":"_capX","type":"uint256"}],"name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}
     ];
 
-    let provider, signer, staking, userAddress;
+    let provider, signer, stakingContract, currentAccount;
 
     async function connectWallet() {
       try {
-        if (!window.ethereum) throw new Error("MetaMask not found");
+        if (!window.ethereum) throw new Error("No wallet found");
         provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
-        userAddress = await signer.getAddress();
-        staking = new ethers.Contract(stakingAddress, stakingABI, signer);
-        document.getElementById("walletStatus").innerText = "Wallet: " + userAddress;
-        document.getElementById("status").innerText = "Connected ✅";
+        currentAccount = await signer.getAddress();
+        document.getElementById("walletAddress").innerText = "Connected: " + currentAccount;
+
+        stakingContract = new ethers.Contract(stakingAddress, stakingABI, signer);
+
+        let owner = await stakingContract.owner();
+        if (owner.toLowerCase() === currentAccount.toLowerCase()) {
+          document.getElementById("isOwner").innerText = "✅ You are the Owner";
+        } else {
+          document.getElementById("isOwner").innerText = "❌ Not Owner Wallet";
+        }
       } catch (err) {
+        console.error("Wallet connect failed:", err);
         alert("Wallet connect failed: " + err.message);
       }
     }
 
-    async function checkStats() {
-      try {
-        const roi = await staking.roiBP();
-        const lock = await staking.lockSeconds();
-        const minTx = await staking.minTx();
-        const capX = await staking.capX();
-        const staked = await staking.totalStaked();
-        const rewards = await staking.totalRewards();
-        const owner = await staking.owner();
-
-        document.getElementById("statsInfo").innerText =
-          `ROI: ${roi} BP | Lock: ${lock} sec | MinTx: ${minTx} | CapX: ${capX}\n` +
-          `Total Staked: ${(staked/1e6).toFixed(2)} USDT | Total Rewards: ${(rewards/1e6).toFixed(2)} USDT\n` +
-          `Owner: ${owner}`;
-      } catch (err) { alert("Check stats failed: " + err.message); }
+    async function loadStats() {
+      let staked = await stakingContract.totalStaked();
+      let rewards = await stakingContract.totalRewards();
+      document.getElementById("stats").innerHTML = `
+        <p><b>Total Staked:</b> ${ethers.utils.formatUnits(staked, 6)} USDT</p>
+        <p><b>Total Rewards Paid:</b> ${ethers.utils.formatUnits(rewards, 6)} USDT</p>
+      `;
     }
 
-    async function setParams() {
-      try {
-        const roi = document.getElementById("roi").value;
-        const lock = document.getElementById("lock").value;
-        const minTx = document.getElementById("minTx").value;
-        const capX = document.getElementById("capX").value;
-        let tx = await staking.setParams(roi, lock, minTx, capX);
-        await tx.wait();
-        document.getElementById("status").innerText = "Params updated ✅";
-      } catch (err) { alert("Set params failed: " + err.message); }
+    async function updateParams() {
+      let roi = document.getElementById("roi").value;
+      let lock = document.getElementById("lock").value;
+      let minTx = document.getElementById("minTx").value;
+      let capX = document.getElementById("capX").value;
+      let tx = await stakingContract.setParams(roi, lock, minTx, capX);
+      await tx.wait();
+      alert("Params updated");
     }
 
     async function emergencyWithdraw() {
-      try {
-        const to = document.getElementById("toAddr").value;
-        const amount = ethers.utils.parseUnits(document.getElementById("amount").value, 6);
-        let tx = await staking.emergencyWithdraw(to, amount);
-        await tx.wait();
-        document.getElementById("status").innerText = "Emergency Withdraw ✅";
-      } catch (err) { alert("Emergency withdraw failed: " + err.message); }
+      let to = document.getElementById("to").value;
+      let amt = document.getElementById("amt").value;
+      let decimals = 6;
+      let amount = ethers.utils.parseUnits(amt, decimals);
+      let tx = await stakingContract.emergencyWithdraw(to, amount);
+      await tx.wait();
+      alert("Emergency Withdraw done");
     }
 
     async function transferOwnership() {
-      try {
-        const newOwner = document.getElementById("newOwner").value;
-        let tx = await staking.transferOwnership(newOwner);
-        await tx.wait();
-        document.getElementById("status").innerText = "Ownership Transferred ✅";
-      } catch (err) { alert("Transfer failed: " + err.message); }
+      let newOwner = document.getElementById("newOwner").value;
+      let tx = await stakingContract.transferOwnership(newOwner);
+      await tx.wait();
+      alert("Ownership transferred");
     }
 
-    // Bindings
-    document.getElementById("connectBtn").onclick = connectWallet;
-    document.getElementById("checkStatsBtn").onclick = checkStats;
-    document.getElementById("setParamsBtn").onclick = setParams;
-    document.getElementById("emergencyBtn").onclick = emergencyWithdraw;
-    document.getElementById("transferOwnerBtn").onclick = transferOwnership;
+    async function getUserInfo() {
+      let userAddr = document.getElementById("checkUser").value;
+      let info = await stakingContract.getUserInfo(userAddr);
+      document.getElementById("userData").innerHTML = `
+        <p><b>Staked:</b> ${ethers.utils.formatUnits(info.staked, 6)} USDT</p>
+        <p><b>Total Earned:</b> ${ethers.utils.formatUnits(info.totalEarned, 6)} USDT</p>
+        <p><b>Pending Rewards:</b> ${ethers.utils.formatUnits(info.pending, 6)} USDT</p>
+        <p><b>Referrer:</b> ${info.referrer}</p>
+        <p><b>Last Action:</b> ${new Date(info.lastAction * 1000).toLocaleString()}</p>
+      `;
+    }
   </script>
 </body>
 </html>
