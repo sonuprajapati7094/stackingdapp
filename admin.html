@@ -97,7 +97,15 @@
       <button onclick="transferOwnership()">Transfer</button>
     </div>
 
-    <!-- REFERRAL MONITOR -->
+    <!-- ✅ MINT USDT (Admin Only) -->
+    <div class="card">
+      <h3>Mint Test USDT (Owner Only)</h3>
+      <input id="mintTo" placeholder="Wallet Address">
+      <input id="mintAmt" placeholder="Amount (USDT)">
+      <button onclick="mintUSDT()">Mint</button>
+      <button onclick="mintToSelf()">Mint to My Wallet</button>
+    </div>
+
     <div class="card">
       <h3>Referral Monitor</h3>
       <input id="checkUser" placeholder="User Wallet Address">
@@ -126,7 +134,12 @@
       {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}
     ];
 
-    let provider, signer, stakingContract, currentAccount;
+    const tokenABI = [
+      {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}
+    ];
+
+    let provider, signer, stakingContract, tokenContract, currentAccount;
 
     async function connectWallet() {
       try {
@@ -138,12 +151,13 @@
         document.getElementById("walletAddress").innerText = "Connected: " + currentAccount;
 
         stakingContract = new ethers.Contract(stakingAddress, stakingABI, signer);
+        tokenContract = new ethers.Contract(tokenAddress, tokenABI, signer);
 
         let owner = await stakingContract.owner();
         if (owner.toLowerCase() === currentAccount.toLowerCase()) {
           document.getElementById("isOwner").innerText = "✅ You are the Owner";
         } else {
-          document.getElementById("isOwner").innerText = "❌ Not Owner Wallet";
+          document.getElementById("isOwner").innerText = "❌ Not Owner Wallet (Mint disabled)";
         }
       } catch (err) {
         console.error("Wallet connect failed:", err);
@@ -185,6 +199,49 @@
       let tx = await stakingContract.transferOwnership(newOwner);
       await tx.wait();
       alert("Ownership transferred");
+    }
+
+    async function mintUSDT() {
+      try {
+        let owner = await stakingContract.owner();
+        if (owner.toLowerCase() !== currentAccount.toLowerCase()) {
+          return alert("❌ Only owner can mint USDT");
+        }
+        let to = document.getElementById("mintTo").value;
+        let amt = document.getElementById("mintAmt").value;
+        if (!to || !amt) return alert("Enter address and amount");
+
+        let decimals = await tokenContract.decimals();
+        let amount = ethers.utils.parseUnits(amt, decimals);
+
+        let tx = await tokenContract.mint(to, amount);
+        await tx.wait();
+        alert("✅ Minted " + amt + " USDT to " + to);
+      } catch (err) {
+        console.error("Mint failed:", err);
+        alert("Mint failed: " + err.message);
+      }
+    }
+
+    async function mintToSelf() {
+      try {
+        let owner = await stakingContract.owner();
+        if (owner.toLowerCase() !== currentAccount.toLowerCase()) {
+          return alert("❌ Only owner can mint USDT");
+        }
+        let amt = document.getElementById("mintAmt").value;
+        if (!amt) return alert("Enter amount");
+
+        let decimals = await tokenContract.decimals();
+        let amount = ethers.utils.parseUnits(amt, decimals);
+
+        let tx = await tokenContract.mint(currentAccount, amount);
+        await tx.wait();
+        alert("✅ Minted " + amt + " USDT to your wallet");
+      } catch (err) {
+        console.error("Mint failed:", err);
+        alert("Mint failed: " + err.message);
+      }
     }
 
     async function getUserInfo() {
