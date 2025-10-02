@@ -1,188 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🚀 USDT Staking — Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>USDT Staking Dashboard</title>
+
+  <!-- ethers v5 UMD -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
-    body {
-      background: #111;
-      font-family: Arial, sans-serif;
-      color: #fff;
-      margin: 0;
-      padding: 0;
+    /* Dark theme styling similar to your original dashboard */
+    :root {
+      --bg: #0b0d0f;
+      --card: #121416;
+      --muted: #9aa4b2;
+      --accent: #ffd86b;
+      --panel: #0f1113;
     }
-    h1 {
-      text-align: center;
-      color: #FFD700;
-      padding: 20px;
-    }
-    .container {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      grid-gap: 20px;
-      padding: 20px;
-    }
-    .card {
-      background: #1c1c1c;
-      border-radius: 8px;
-      padding: 20px;
-    }
-    .card h2 {
-      margin: 0 0 10px;
-      color: #FFD700;
-      font-size: 18px;
-    }
-    .card input, .card button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border: none;
-      border-radius: 5px;
-      font-size: 14px;
-    }
-    .yellow-btn {
-      background: #FFD700;
-      color: #000;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-    .yellow-btn:hover {
-      background: #e6c200;
-    }
-    .wallet-btn {
-      display: block;
-      margin: 0 auto;
-      margin-bottom: 20px;
-      background: #FFD700;
-      color: #000;
-      border: none;
-      border-radius: 5px;
-      padding: 10px 20px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    .income-boxes {
-      display: flex;
-      justify-content: space-between;
-    }
-    .income-item {
-      flex: 1;
-      background: #000;
-      margin: 5px;
-      padding: 10px;
-      border-radius: 5px;
-      text-align: center;
-    }
-    .level-structure {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    .level-structure th, .level-structure td {
-      border: 1px solid #333;
-      padding: 8px;
-      text-align: center;
-    }
-    .level-structure th {
-      background: #222;
-      color: #FFD700;
+    body { margin:0; font-family: Inter, Arial, sans-serif; background:var(--bg); color:#e6eef6; }
+    header { padding:18px 24px; text-align:center; background:linear-gradient(90deg,#081018, #0d1016); box-shadow:0 2px 8px rgba(0,0,0,0.5); }
+    header h1 { margin:0; color:var(--accent); font-size:20px; letter-spacing:0.6px; }
+    .topbar { display:flex; justify-content:flex-end; gap:12px; padding:12px 24px; align-items:center; }
+    .wallet-btn { background:var(--accent); color:#000; padding:8px 14px; border-radius:8px; border:0; font-weight:600; cursor:pointer; }
+    .container { padding: 20px; display:grid; grid-template-columns: 360px 1fr; gap:18px; max-width:1180px; margin:18px auto; }
+
+    /* left column small panels */
+    .left { display:flex; flex-direction:column; gap:14px; }
+    .card { background:var(--card); border-radius:12px; padding:14px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    .card h2 { margin:0 0 10px 0; color:var(--accent); font-size:16px; }
+    .muted { color:var(--muted); font-size:13px; }
+
+    input[type="number"], input[type="text"] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:var(--panel); color:#fff; }
+    .small-btn { padding:10px 12px; border-radius:8px; border:0; background:#2a2f35; color:#fff; cursor:pointer; margin-top:8px; }
+    .accent-btn { background:var(--accent); color:#000; border:0; padding:10px 12px; border-radius:8px; cursor:pointer; font-weight:700; margin-top:8px; }
+
+    /* right column wide */
+    .right { display:flex; flex-direction:column; gap:14px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .value { font-size:18px; font-weight:700; color:#fff; }
+    .label { font-size:12px; color:var(--muted); margin-top:6px; }
+
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th,td { padding:10px 8px; border-bottom:1px solid rgba(255,255,255,0.03); text-align:left; }
+    th { color:var(--accent); font-weight:700; background:transparent; }
+
+    .center { text-align:center; }
+    .sm { font-size:12px; color:var(--muted); }
+
+    footer { padding:14px; text-align:center; color:var(--muted); font-size:12px; }
+    @media(max-width:980px) {
+      .container { grid-template-columns: 1fr; padding:12px; }
+      .grid-4 { grid-template-columns: repeat(2,1fr); }
     }
   </style>
 </head>
 <body>
-  <h1>🚀 USDT Staking — Dashboard</h1>
-  <button id="connectButton" class="wallet-btn">Connect Wallet</button>
+  <header>
+    <h1>USDT Staking — Dashboard</h1>
+  </header>
 
-  <div class="container">
-
-    <!-- Stake -->
-    <div class="card">
-      <h2>Stake USDT</h2>
-      <input id="stakeAmount" placeholder="Amount (min 20, multiples of 20)" />
-      <button class="yellow-btn" onclick="approve()">Quick Approve</button>
-      <button class="yellow-btn" onclick="stake()">Stake</button>
-    </div>
-
-    <!-- Referral -->
-    <div class="card">
-      <h2>Your referral link</h2>
-      <input id="refLink" readonly />
-      <button class="yellow-btn" onclick="copyRef()">Copy</button>
-      <p style="font-size: 12px; color:#aaa">Share this link — only users who join using a referral link will be accepted (if contract enforces it).</p>
-    </div>
-
-    <!-- Income -->
-    <div class="card">
-      <h2>Income Wallets</h2>
-      <div class="income-boxes">
-        <div class="income-item">
-          <div>Instant income</div>
-          <div id="instantIncome">0 USDT</div>
-        </div>
-        <div class="income-item">
-          <div>Level income</div>
-          <div id="levelIncome">0 USDT</div>
-        </div>
-        <div class="income-item">
-          <div>ROI income</div>
-          <div id="roiIncome">0 USDT</div>
-        </div>
-        <div class="income-item">
-          <div>Total Wallet</div>
-          <div id="totalWallet">0 USDT</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Withdraw -->
-    <div class="card">
-      <h2>Withdraw</h2>
-      <input id="withdrawAmount" placeholder="Amount (min 10, multiples of 10)" />
-      <button class="yellow-btn" onclick="withdraw()">Request Withdraw</button>
-      <div id="withdrawStatus">No withdrawals yet.</div>
-    </div>
-
-    <!-- Staking Info -->
-    <div class="card">
-      <h2>Staking Info</h2>
-      <p>Staked: <span id="staked">0 USDT</span></p>
-      <p>Target (3x): <span id="target">0 USDT</span></p>
-      <p>Days to 3x: <span id="daysTo3x">0 days</span></p>
-      <p>Package Status: <span id="packageStatus">Inactive</span></p>
-    </div>
-
-    <!-- Level Structure -->
-    <div class="card">
-      <h2>Level Structure</h2>
-      <table class="level-structure">
-        <thead>
-          <tr><th>Level</th><th>Percent</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>L1</td><td>10%</td><td>Pending</td></tr>
-          <tr><td>L2</td><td>10%</td><td>Pending</td></tr>
-          <tr><td>L3</td><td>5%</td><td>Pending</td></tr>
-          <tr><td>L4</td><td>3%</td><td>Pending</td></tr>
-          <tr><td>L5</td><td>2%</td><td>Pending</td></tr>
-          <tr><td>L6</td><td>1%</td><td>Pending</td></tr>
-          <tr><td>L7</td><td>1%</td><td>Pending</td></tr>
-          <tr><td>L8</td><td>1%</td><td>Pending</td></tr>
-          <tr><td>L9</td><td>1%</td><td>Pending</td></tr>
-          <tr><td>L10</td><td>1%</td><td>Pending</td></tr>
-        </tbody>
-      </table>
-    </div>
-
+  <div class="topbar" style="max-width:1180px;margin:0 auto">
+    <div id="walletDisplay" class="sm muted">Not connected</div>
+    <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
   </div>
 
-<script>
-  const contractAddress = "0x3aF2c75A4723b2139EB803bf5d558e7d43991D6E";
-  const tokenAddress = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C";
+  <main class="container">
 
-  // ✅ ABI embedded
-  const contractABI = [
+    <!-- LEFT COLUMN -->
+    <div class="left">
+
+      <div class="card">
+        <h2>Stake USDT</h2>
+        <div class="sm muted">Minimum deposit: 20 USDT — multiples of 20 only</div>
+        <input id="stakeAmount" type="number" placeholder="20, 40, 60 ..." />
+        <button class="accent-btn" id="quickApproveBtn">Quick Approve</button>
+        <button class="accent-btn" id="stakeBtn">Stake Now</button>
+        <div class="sm" style="margin-top:10px;">Tip: Approve once (Quick Approve) then stake.</div>
+      </div>
+
+      <div class="card">
+        <h2>Your Referral Link</h2>
+        <input id="referralInput" type="text" readonly />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="small-btn" id="copyRefBtn">Copy Link</button>
+          <button class="small-btn" id="showTeamBtn">Show Team</button>
+        </div>
+        <div class="sm muted" style="margin-top:8px;">Share this link. Only users who join via referral will be accepted (if contract enforces).</div>
+      </div>
+
+      <div class="card">
+        <h2>Withdraw</h2>
+        <div class="sm muted">Minimum withdraw 10 USDT — multiples of 10. Withdrawals require admin approval (if enabled).</div>
+        <input id="withdrawAmount" type="number" placeholder="10, 20, 30 ..." />
+        <button class="accent-btn" id="withdrawBtn">Request Withdraw</button>
+        <div id="withdrawStatus" class="sm" style="margin-top:8px;">No withdraw actions yet.</div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right">
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h2>Wallet Balances & Income</h2>
+            <div class="sm muted">Instant / Level / ROI breakdown</div>
+          </div>
+          <div>
+            <button class="small-btn" id="refreshBtn">Refresh Now</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" class="grid-4">
+          <div class="card" style="background:#0b0d0f; padding:12px;">
+            <div class="label">Instant Income</div>
+            <div class="value" id="instantIncome">0.000000 USDT</div>
+          </div>
+          <div class="card" style="background:#0b0d0f; padding:12px;">
+            <div class="label">Level Income</div>
+            <div class="value" id="levelIncome">0.000000 USDT</div>
+          </div>
+          <div class="card" style="background:#0b0d0f; padding:12px;">
+            <div class="label">ROI Pending</div>
+            <div class="value" id="roiPending">0.000000 USDT</div>
+          </div>
+          <div class="card" style="background:#0b0d0f; padding:12px;">
+            <div class="label">Total Wallet</div>
+            <div class="value" id="totalWallet">0.000000 USDT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Staking Info</h2>
+        <table>
+          <tr><th>Metric</th><th>Value</th></tr>
+          <tr><td>Staked</td><td id="stakedDisplay">0.000000 USDT</td></tr>
+          <tr><td>Target (3x)</td><td id="targetDisplay">0.000000 USDT</td></tr>
+          <tr><td>Days to 3x</td><td id="days3x">0 days</td></tr>
+          <tr><td>Package Status</td><td id="pkgStatus">Inactive</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Team & Levels</h2>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <div style="flex:1">
+            <div class="sm muted">Direct</div>
+            <div class="value" id="directCount">0</div>
+          </div>
+          <div style="flex:1">
+            <div class="sm muted">Indirect</div>
+            <div class="value" id="indirectCount">0</div>
+          </div>
+          <div style="flex:2">
+            <div class="sm muted">Active / Inactive</div>
+            <div class="value" id="activeCounts">0 / 0</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <table>
+            <thead><tr><th>Level</th><th>Percent</th><th>Status</th></tr></thead>
+            <tbody id="levelsTbody">
+              <tr><td>L1</td><td>10%</td><td id="sL1">Pending</td></tr>
+              <tr><td>L2</td><td>10%</td><td id="sL2">Pending</td></tr>
+              <tr><td>L3</td><td>5%</td><td id="sL3">Pending</td></tr>
+              <tr><td>L4</td><td>3%</td><td id="sL4">Pending</td></tr>
+              <tr><td>L5</td><td>2%</td><td id="sL5">Pending</td></tr>
+              <tr><td>L6</td><td>1%</td><td id="sL6">Pending</td></tr>
+              <tr><td>L7</td><td>1%</td><td id="sL7">Pending</td></tr>
+              <tr><td>L8</td><td>1%</td><td id="sL8">Pending</td></tr>
+              <tr><td>L9</td><td>1%</td><td id="sL9">Pending</td></tr>
+              <tr><td>L10</td><td>1%</td><td id="sL10">Pending</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Withdrawal History</h2>
+        <div id="withdrawTableWrapper" class="sm">No withdrawal history loaded.</div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer>Made with ❤️ — Testnet only (do not use mainnet funds while testing)</footer>
+
+  <script>
+  /**************************************************************************
+   * IMPORTANT:
+   * - This file expects your staking contract ABI and deployed addresses below.
+   * - It uses on-chain `pendingRewards(user)` to show live ROI on refresh.
+   * - Token decimals are read from token contract (USDT typically 6).
+   **************************************************************************/
+
+  // ----------------- configuration -----------------
+  const STAKING_ADDRESS = "0x3aF2c75A4723b2139EB803bf5d558e7d43991D6E"; // new staking address
+  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // token (mock USDT)
+  let TOKEN_DECIMALS = 6; // default; will be overwritten by on-chain call if available
+
+  // ----------------- ABI (staking contract's ABI embedded) -----------------
+  const STAKING_ABI = [
     {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"address","name":"_owner","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"reward","type":"uint256"}],"name":"Claim","type":"event"},
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"address","name":"referrer","type":"address"}],"name":"Deposit","type":"event"},
@@ -213,107 +235,301 @@
     {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawPrincipal","outputs":[],"stateMutability":"nonpayable","type":"function"}
   ];
 
-  let provider, signer, contract, account;
+  // minimal ERC20 ABI used for reading decimals, balanceOf and approve
+  const TOKEN_ABI = [
+    "function decimals() view returns (uint8)",
+    "function balanceOf(address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)"
+  ];
 
-  async function connectWallet() {
-    if (window.ethereum) {
-      provider = new ethers.providers.Web3Provider(window.ethereum);
+  // ---------- app state ----------
+  let provider, signer, stakingContract, tokenContract;
+  let account = null;
+
+  // ---------- helpers ----------
+  function toFixedNumber(num, decimals=6) {
+    if (isNaN(num)) return "0.000000";
+    return Number(num).toFixed(decimals);
+  }
+
+  // Format units from smallest to displayed
+  function fromUnits(valueBn) {
+    try {
+      return Number(ethers.utils.formatUnits(valueBn, TOKEN_DECIMALS));
+    } catch (e) {
+      // fallback
+      return Number(valueBn) / (10 ** TOKEN_DECIMALS);
+    }
+  }
+
+  // ----------------- connect wallet -----------------
+  async function connect() {
+    try {
+      if (!window.ethereum) { alert("MetaMask not found"); return; }
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
       await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
       account = await signer.getAddress();
-      contract = new ethers.Contract(contractAddress, contractABI, signer);
+      document.getElementById("walletDisplay").innerText = account;
+      // init contracts
+      stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+      tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
 
-      document.getElementById("connectButton").innerText = account.slice(0,6)+"..."+account.slice(-4);
-      localStorage.setItem("connectedWallet", account);
+      // read decimals (USDT usually 6)
+      try {
+        TOKEN_DECIMALS = await tokenContract.decimals();
+      } catch (e) {
+        // some mock tokens don't expose decimals; keep default 6
+        console.warn("Couldn't read token decimals, using default", TOKEN_DECIMALS);
+      }
 
-      refreshAll();
-    } else {
-      alert("MetaMask not detected!");
+      // set referral link value
+      document.getElementById("referralInput").value = window.location.origin + window.location.pathname + "?ref=" + account;
+
+      // store connected
+      localStorage.setItem("staking_connected", account);
+
+      // initial refresh
+      await refreshAll();
+
+      // start event listeners (withdraws, deposits, claims)
+      listenEvents();
+
+    } catch (err) {
+      console.error("connect error", err);
+      alert("Connect failed: " + (err.message || err));
     }
   }
 
-  // Auto reconnect
+  document.getElementById("connectBtn").addEventListener("click", connect);
+
+  // auto reconnect
   window.addEventListener("load", async () => {
-    if(localStorage.getItem("connectedWallet")) {
-      await connectWallet();
+    const prev = localStorage.getItem("staking_connected");
+    if (prev) {
+      // try to restore silently
+      try { await connect(); } catch(e) { console.log("reconnect failed"); }
     }
   });
 
+  // ----------------- refresh logic -----------------
   async function refreshAll() {
-    if(!contract) return;
+    if (!stakingContract || !account) return;
     try {
-      let user = await contract.getUserInfo(account);
-      let staked = parseFloat(ethers.utils.formatUnits(user.staked,6));
-      document.getElementById("staked").innerText = staked+" USDT";
-      document.getElementById("target").innerText = (staked*3).toFixed(2)+" USDT";
+      // 1) read token wallet balance
+      let rawBal = await tokenContract.balanceOf(account);
+      let walletBal = fromUnits(rawBal);
+      // show user wallet balance in a small place (topbar)
+      document.getElementById("walletDisplay").innerText = account + " — " + toFixedNumber(walletBal,6) + " USDT";
 
-      // ROI income
-      let roiIncome = parseFloat(ethers.utils.formatUnits(user.pending,6));
-      document.getElementById("roiIncome").innerText = roiIncome.toFixed(6)+" USDT";
+      // 2) get user info (staked, totalEarned, pending included by getUserInfo)
+      const userInfo = await stakingContract.getUserInfo(account);
+      // userInfo: staked, lastAction, referrer, totalEarned, pending
+      const staked = fromUnits(userInfo.staked || 0);
+      const totalEarned = fromUnits(userInfo.totalEarned || 0);
+      // Note: getUserInfo returns 'pending' which should equal pendingRewards(user)
+      const pending = fromUnits(userInfo.pending || 0);
 
-      // Instant + level dummy = 0 (change if your contract supports)
-      let instantIncome = 0;
-      let levelIncome = 0;
-      document.getElementById("instantIncome").innerText = instantIncome+" USDT";
-      document.getElementById("levelIncome").innerText = levelIncome+" USDT";
+      // update staking displays
+      document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
+      document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
 
-      // Total wallet
-      let total = roiIncome + instantIncome + levelIncome;
-      document.getElementById("totalWallet").innerText = total.toFixed(6)+" USDT";
+      // compute days to 3x using on-chain roiBP (annual basis points)
+      let roiBP = 0;
+      try { roiBP = await stakingContract.roiBP(); } catch(e) { console.warn("roiBP read failed", e); roiBP = 1800; }
+      // roiBP is e.g. 1800 => 18% per year
+      const annualRate = Number(roiBP) / 10000; // e.g. 0.18
+      // daily reward per staked = staked * annualRate / 365
+      let daysTo3x = 0;
+      if (staked > 0 && annualRate > 0) {
+        const dailyRewardPerStaked = (staked * annualRate) / 365.0;
+        // remaining until 3x = (staked*3) - (totalEarned + pending + instant + level)
+        // We don't have instant/level breakdown from contract so approximate using totalEarned + pending
+        const already = totalEarned + pending;
+        const remaining = Math.max((staked * 3) - already, 0.0);
+        daysTo3x = dailyRewardPerStaked > 0 ? Math.ceil(remaining / dailyRewardPerStaked) : 0;
+      }
+      document.getElementById("days3x").innerText = (daysTo3x>0?daysTo3x:"0") + " days";
+      document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
 
-      // Days to 3x (based on 18% monthly)
-      let roiPercent = 0.18;
-      let monthlyIncome = staked*roiPercent;
-      let monthsTo3x = (staked*3)/monthlyIncome;
-      let days = Math.ceil(monthsTo3x*30);
-      document.getElementById("daysTo3x").innerText = days+" days";
-      document.getElementById("packageStatus").innerText = staked>0 ? "Active":"Inactive";
+      // 3) pendingRewards direct call to ensure freshest value
+      let pendingDirect = 0;
+      try {
+        const p = await stakingContract.pendingRewards(account);
+        pendingDirect = fromUnits(p || 0);
+      } catch(e) {
+        // fallback to userInfo.pending
+        pendingDirect = pending;
+      }
+      document.getElementById("roiPending").innerText = toFixedNumber(pendingDirect,6) + " USDT";
 
-    } catch(err) {
-      console.log("refresh error:",err);
+      // 4) instant/level incomes - these aren't explicitly returned by contract;
+      // we'll use totalEarned (storage) - pending to approximate level/instant earned already claimed/credited.
+      // Note: your contract stores totalEarned as cumulative of past rewards + referral/levels if you update it.
+      const roiIncome = pendingDirect;          // not yet claimed ROI
+      const earnedAlready = totalEarned;       // previously credited (from deposit/claim)
+      // We cannot precisely split earnedAlready into instant vs level without extra contract getters.
+      // Keep instant & level as 0 if not tracked separately.
+      const instantIncome = 0.0;
+      const levelIncome = Math.max(earnedAlready - 0.0 - 0.0, 0.0);
+
+      document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome,6) + " USDT";
+      document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome,6) + " USDT";
+      document.getElementById("roiPending").innerText = toFixedNumber(roiIncome,6) + " USDT";
+
+      // total wallet = already earned (claimed/credited) + pending (not yet credited)
+      const totalWallet = earnedAlready + pendingDirect;
+      document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
+
+      // Update some team placeholders (to be filled by event parsing or additional getters)
+      // For now keep zeros unless you instrument deposits events to build team tree.
+      document.getElementById("directCount").innerText = "0";
+      document.getElementById("indirectCount").innerText = "0";
+      document.getElementById("activeCounts").innerText = "0 / 0";
+
+      // Load withdraw history and deposit history events (limited scan)
+      await loadRecentEvents(); // non-blocking UI
+    } catch (err) {
+      console.error("refreshAll error:", err);
     }
   }
 
-  async function approve(){
+  document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+
+  // auto-refresh every 60s
+  setInterval(() => {
+    if (stakingContract && account) refreshAll();
+  }, 60000);
+
+  // ----------------- Approve / Stake / Withdraw -----------------
+  async function approveQuick() {
     try {
-      const tokenABI = [
-        "function approve(address spender, uint256 amount) public returns (bool)"
-      ];
-      const token = new ethers.Contract(tokenAddress, tokenABI, signer);
-      let tx = await token.approve(contractAddress, ethers.constants.MaxUint256);
+      if (!tokenContract || !signer) { alert("Connect first"); return; }
+      const max = ethers.constants.MaxUint256;
+      const tx = await tokenContract.approve(STAKING_ADDRESS, max);
       await tx.wait();
-      alert("Approved!");
-    } catch(err){ alert("Approve failed: "+err.message); }
+      alert("Approve successful");
+    } catch (e) {
+      console.error("approve error", e);
+      alert("Approve failed: " + (e.message || e));
+    }
   }
+  document.getElementById("quickApproveBtn").addEventListener("click", approveQuick);
 
-  async function stake(){
+  async function stake() {
     try {
-      let amt = document.getElementById("stakeAmount").value;
-      let tx = await contract.deposit(ethers.utils.parseUnits(amt,6), "0x0000000000000000000000000000000000000000");
-      await tx.wait();
-      alert("Staked!");
-      refreshAll();
-    } catch(err){ alert("Stake failed: "+err.message); }
-  }
+      if (!stakingContract || !signer) { alert("Connect first"); return; }
+      let amtStr = document.getElementById("stakeAmount").value;
+      if (!amtStr || Number(amtStr) <= 0) { alert("Enter stake amount"); return; }
+      const amt = Number(amtStr);
+      if (amt < 20 || (amt % 20) !== 0) { alert("Stake must be at least 20 USDT and multiple of 20"); return; }
 
-  async function withdraw(){
+      const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+      const tx = await stakingContract.deposit(units, ethers.constants.AddressZero);
+      await tx.wait();
+      alert("Deposit successful");
+      await refreshAll();
+    } catch (e) {
+      console.error("stake error", e);
+      alert("Stake failed: " + (e.data?.message || e.message || e));
+    }
+  }
+  document.getElementById("stakeBtn").addEventListener("click", stake);
+
+  async function withdraw() {
     try {
-      let amt = document.getElementById("withdrawAmount").value;
-      let tx = await contract.withdrawPrincipal(ethers.utils.parseUnits(amt,6));
+      if (!stakingContract || !signer) { alert("Connect first"); return; }
+      const amtStr = document.getElementById("withdrawAmount").value;
+      if (!amtStr || Number(amtStr) <= 0) { alert("Enter withdraw amount"); return; }
+      const amt = Number(amtStr);
+      if (amt < 10 || (amt % 10) !== 0) { alert("Withdraw must be at least 10 USDT and multiple of 10"); return; }
+
+      const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+      const tx = await stakingContract.withdrawPrincipal(units);
       await tx.wait();
-      document.getElementById("withdrawStatus").innerText="Withdrawal done!";
-      refreshAll();
-    } catch(err){ alert("Withdraw failed: "+err.message); }
+      document.getElementById("withdrawStatus").innerText = "Withdraw request processed (check blockchain).";
+      await refreshAll();
+    } catch (e) {
+      console.error("withdraw error", e);
+      alert("Withdraw failed: " + (e.data?.message || e.message || e));
+    }
+  }
+  document.getElementById("withdrawBtn").addEventListener("click", withdraw);
+
+  // ----------------- events reading for histories (lightweight) -----------------
+  async function loadRecentEvents() {
+    if (!provider || !stakingContract) return;
+    try {
+      // Use a small block range scan (testnet) — careful on mainnet
+      const current = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, current - 50000); // adjust if needed
+      // Fetch Withdraw events for user
+      const withdrawFilter = stakingContract.filters.Withdraw(account);
+      const withdrawEvents = await stakingContract.queryFilter(withdrawFilter, fromBlock, current);
+      if (withdrawEvents && withdrawEvents.length) {
+        let html = `<table><tr><th>Tx</th><th>Amount</th><th>Block</th></tr>`;
+        withdrawEvents.slice(-20).reverse().forEach(ev => {
+          const amt = fromUnits(ev.args.amount || ev.args[1] || 0);
+          html += `<tr><td><a href="#" onclick="openTx('${ev.transactionHash}')">${ev.transactionHash.slice(0,10)}...</a></td><td>${toFixedNumber(amt,6)} USDT</td><td>${ev.blockNumber}</td></tr>`;
+        });
+        html += `</table>`;
+        document.getElementById("withdrawTableWrapper").innerHTML = html;
+      } else {
+        document.getElementById("withdrawTableWrapper").innerText = "No withdrawals found.";
+      }
+    } catch (e) {
+      console.warn("loadRecentEvents error", e);
+    }
   }
 
-  function copyRef(){
-    const ref = window.location.origin + window.location.pathname + "?ref="+account;
-    document.getElementById("refLink").value = ref;
-    navigator.clipboard.writeText(ref);
-    alert("Referral link copied!");
+  function openTx(hash) {
+    // Open BSC testnet explorer if using BSC testnet — user can change
+    // We'll try generic: etherscan-like. For testnets you might need to update to testnet explorer URL
+    const url = `https://testnet.bscscan.com/tx/${hash}`;
+    window.open(url, "_blank");
   }
 
-  setInterval(refreshAll,60000);
-</script>
+  // Listen to Deposit/Claim/Withdraw events to auto-refresh UI
+  function listenEvents() {
+    try {
+      if (!stakingContract) return;
+      stakingContract.on("Deposit", (user, amount, referrer, event) => {
+        console.log("Deposit event", user, amount.toString());
+        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
+      });
+      stakingContract.on("Claim", (user, reward, event) => {
+        console.log("Claim event", user, reward.toString());
+        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
+      });
+      stakingContract.on("Withdraw", (user, amount, event) => {
+        console.log("Withdraw event", user, amount.toString());
+        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
+      });
+    } catch (e) {
+      console.warn("listenEvents", e);
+    }
+  }
+
+  // ----------------- referral copy / show team (placeholder) -----------------
+  document.getElementById("copyRefBtn").addEventListener("click", async () => {
+    if (!account) { alert("Connect wallet first"); return; }
+    const link = window.location.origin + window.location.pathname + "?ref=" + account;
+    await navigator.clipboard.writeText(link);
+    alert("Copied referral link");
+  });
+
+  document.getElementById("showTeamBtn").addEventListener("click", async () => {
+    alert("Team view: currently requires building off-chain index from Deposit events. Will add soon.");
+  });
+
+  // ----------------- small helpers -----------------
+  window.openExternal = (url) => window.open(url, "_blank");
+
+  // expose connect on top button
+  document.getElementById("connectBtn").addEventListener("click", connect);
+
+  // debug helper: show provider type
+  console.log("Dashboard loaded. Ready to connect.");
+  </script>
 </body>
 </html>
