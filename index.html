@@ -976,23 +976,20 @@
       document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
       document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
 
-      // compute days to 3x using on-chain roiBP (annual basis points)
-      let roiBP = 0;
-      try { roiBP = await stakingContract.roiBP(); } catch(e) { console.warn("roiBP read failed", e); roiBP = 1800; }
-      // roiBP is e.g. 1800 => 18% per year
-      const annualRate = Number(roiBP) / 10000; // e.g. 0.18
-      // daily reward per staked = staked * annualRate / 365
-      let daysTo3x = 0;
-      if (staked > 0 && annualRate > 0) {
-        const dailyRewardPerStaked = (staked * annualRate) / 365.0;
-        // remaining until 3x = (staked*3) - (totalEarned + pending + instant + level)
-        // We don't have instant/level breakdown from contract so approximate using totalEarned + pending
-        const already = totalEarned + pending;
-        const remaining = Math.max((staked * 3) - already, 0.0);
-        daysTo3x = dailyRewardPerStaked > 0 ? Math.ceil(remaining / dailyRewardPerStaked) : 0;
-      }
-      document.getElementById("days3x").innerText = (daysTo3x>0?daysTo3x:"0") + " days";
-      document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
+     // --- compute Days to 3x with daily ROI 0.6% (18% monthly) ---
+let daysTo3x = 0;
+if (staked > 0) {
+    const dailyRate = 0.006; // 0.6% per day
+    const dailyReward = staked * dailyRate;
+
+    const already = totalEarned + pending;
+    const remaining = Math.max((staked * 3) - already, 0.0);
+
+    daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
+}
+document.getElementById("days3x").innerText = (daysTo3x > 0 ? daysTo3x : "0") + " days";
+document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
+
 
       // 3) pendingRewards direct call to ensure freshest value
       let pendingDirect = 0;
