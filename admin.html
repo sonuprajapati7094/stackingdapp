@@ -1,159 +1,557 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>USDT Staking — Admin Panel</title>
-  <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+
+  <!-- ethers v5 UMD -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
-    body { background:#0d0d0d; color:#f5f5f5; font-family: Arial, sans-serif; text-align:center; }
-    h2 { margin-top:20px; }
-    button { padding:10px 18px; border:none; cursor:pointer; border-radius:6px; font-weight:bold; }
-    .yellow { background:#f5c518; color:#000; }
-    .red { background:#e63946; color:#fff; }
-    .green { background:#06d6a0; color:#000; }
-    .card { background:#1a1a1a; margin:20px auto; padding:20px; border-radius:10px; width:400px; text-align:left; }
-    input { width:100%; padding:8px; margin:5px 0; border-radius:5px; border:none; }
-    .status { margin:10px 0; font-weight:bold; }
+    :root {
+      --bg: #0b0d0f;
+      --card: #121416;
+      --muted: #9aa4b2;
+      --accent: #ffd86b;
+      --panel: #0f1113;
+      --danger: #ff6b6b;
+    }
+    body { margin:0; font-family: Inter, Arial, sans-serif; background:var(--bg); color:#e6eef6; }
+    header { padding:18px 24px; text-align:center; background:linear-gradient(90deg,#081018, #0d1016); box-shadow:0 2px 8px rgba(0,0,0,0.5); }
+    header h1 { margin:0; color:var(--accent); font-size:20px; letter-spacing:0.6px; }
+    .topbar { display:flex; justify-content:space-between; gap:12px; padding:12px 24px; align-items:center; max-width:1200px; margin:8px auto; }
+    .wallet-btn { background:var(--accent); color:#000; padding:8px 14px; border-radius:8px; border:0; font-weight:600; cursor:pointer; }
+    .container { padding: 20px; display:grid; grid-template-columns: 1fr 420px; gap:18px; max-width:1200px; margin:18px auto; }
+
+    .card { background:var(--card); border-radius:12px; padding:14px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    h2 { margin:0 0 10px 0; color:var(--accent); font-size:16px; }
+    .muted { color:var(--muted); font-size:13px; }
+    input[type="number"], input[type="text"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:var(--panel); color:#fff; box-sizing:border-box; }
+    button { padding:10px 12px; border-radius:8px; border:0; cursor:pointer; }
+    .btn-primary { background:var(--accent); color:#000; font-weight:700; }
+    .btn-danger { background:var(--danger); color:#000; font-weight:700; }
+    .row { display:flex; gap:12px; align-items:center; margin-top:8px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th,td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.03); text-align:left; }
+    th { color:var(--accent); font-weight:700; }
+    .small { font-size:12px; color:var(--muted); }
+    footer { padding:14px; text-align:center; color:var(--muted); font-size:12px; max-width:1200px; margin:16px auto; }
+    @media(max-width:1000px) {
+      .container { grid-template-columns: 1fr; padding:12px; }
+    }
   </style>
 </head>
 <body>
-  <h2>⚙️ USDT Staking — Admin Panel</h2>
-  <button id="connectBtn" class="yellow">Connect Wallet</button>
-  <div id="walletAddress">Wallet: Not Connected</div>
-  <div id="adminStatus" class="status"></div>
+  <header><h1>USDT Staking — Admin Panel</h1></header>
 
-  <!-- Contract Stats -->
-  <div class="card">
-    <h3>📊 Contract Stats</h3>
-    <div id="contractStats">-</div>
-    <button onclick="refreshStats()" class="green">Refresh Stats</button>
+  <div class="topbar">
+    <div>
+      <div id="adminAddr" class="small muted">Not connected</div>
+      <div id="ownerAddr" class="small muted">Owner: -</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div id="networkDisplay" class="small muted"></div>
+      <button id="connectBtn" class="wallet-btn">Connect Admin</button>
+    </div>
   </div>
 
-  <!-- Update Params -->
-  <div class="card">
-    <h3>🔧 Update Parameters</h3>
-    <input id="roiBP" placeholder="ROI BP (e.g. 1800)">
-    <input id="lockSec" placeholder="Lock Period (sec)">
-    <input id="minTx" placeholder="MinTx (USDT)">
-    <input id="capX" placeholder="CapX (e.g. 3)">
-    <button onclick="updateParams()" class="yellow">Update Params</button>
-  </div>
+  <main class="container">
+    <!-- LEFT: main admin actions -->
+    <div>
 
-  <!-- Withdrawal Requests -->
-  <div class="card">
-    <h3>💸 Pending Withdrawals</h3>
-    <div id="withdrawList">No pending requests</div>
-  </div>
+      <div class="card">
+        <h2>Contract Summary</h2>
+        <div class="row">
+          <div style="flex:1">
+            <div class="small muted">Staking Contract</div>
+            <div id="contractAddr" style="word-break:break-all">-</div>
+          </div>
+          <div style="width:220px">
+            <div class="small muted">Token (USDT)</div>
+            <div id="tokenAddr" style="word-break:break-all">-</div>
+          </div>
+        </div>
 
-  <!-- Emergency Withdraw -->
-  <div class="card">
-    <h3>🚨 Emergency Withdraw</h3>
-    <input id="emgTo" placeholder="Recipient Address">
-    <input id="emgAmt" placeholder="Amount (USDT)">
-    <button onclick="emergencyWithdraw()" class="red">Execute</button>
-  </div>
+        <div style="display:flex; gap:12px; margin-top:12px;">
+          <div style="flex:1">
+            <div class="small muted">Total Staked</div>
+            <div id="totalStaked">0</div>
+          </div>
+          <div style="flex:1">
+            <div class="small muted">Total Rewards (tracked)</div>
+            <div id="totalRewards">0</div>
+          </div>
+          <div style="flex:1">
+            <div class="small muted">Contract Token Balance</div>
+            <div id="contractTokenBal">0</div>
+          </div>
+        </div>
 
-  <!-- Mint (Testnet only) -->
-  <div class="card">
-    <h3>🪙 Mint USDT (Testnet only)</h3>
-    <input id="mintAmt" placeholder="Amount (USDT)">
-    <button onclick="mintUSDT()" class="yellow">Mint</button>
-  </div>
+        <div style="margin-top:12px">
+          <button id="refreshSummary" class="btn-primary">Refresh Summary</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>Withdraw Requests</h2>
+        <div class="small muted">Approve or inspect pending withdrawals</div>
+
+        <div style="margin-top:10px">
+          <button id="loadWithdraws" class="btn-primary">Load Withdraw Requests</button>
+        </div>
+
+        <div id="withdrawsWrapper" style="margin-top:12px" class="small muted">No withdraws loaded.</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>Admin Actions</h2>
+        <div class="small muted">Owner-only actions: emergency withdraw, mint, transfer ownership</div>
+
+        <div style="margin-top:8px">
+          <label class="small muted">Emergency Withdraw to address</label>
+          <input id="emgTo" type="text" placeholder="0x..." />
+          <input id="emgAmount" type="number" placeholder="amount (USDT units ex: 100.0)" />
+          <div class="row">
+            <button id="btnEmergencyWithdraw" class="btn-danger">Emergency Withdraw</button>
+            <button id="btnRefreshBal" class="btn-primary">Refresh Bal</button>
+          </div>
+        </div>
+
+        <hr style="opacity:0.06;margin:12px 0" />
+
+        <div>
+          <label class="small muted">Mint (test tokens) — to address</label>
+          <input id="mintTo" type="text" placeholder="0x..." />
+          <input id="mintAmount" type="number" placeholder="units (smallest token unit)" />
+          <div class="row">
+            <button id="btnMint" class="btn-primary">Mint</button>
+          </div>
+        </div>
+
+        <hr style="opacity:0.06;margin:12px 0" />
+
+        <div>
+          <label class="small muted">Transfer Ownership</label>
+          <input id="newOwner" type="text" placeholder="0x..." />
+          <div class="row">
+            <button id="btnTransferOwner" class="btn-primary">Transfer Ownership</button>
+            <button id="btnReloadOwner" class="btn-primary">Reload Owner</button>
+          </div>
+        </div>
+
+        <hr style="opacity:0.06;margin:12px 0" />
+
+        <div>
+          <label class="small muted">Set Fee Collector</label>
+          <input id="setFeeCollectorAddr" type="text" placeholder="0x..." />
+          <div class="row">
+            <button id="btnSetFeeCollector" class="btn-primary">Set Fee Collector</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>Contract Params</h2>
+        <div class="small muted">Change ROI / lock / minTx / capX</div>
+        <div style="display:grid; gap:8px; margin-top:8px">
+          <label class="small muted">roiBP (basis points) — e.g. monthly 18% = 1800</label>
+          <input id="paramRoi" type="number" placeholder="roiBP" />
+          <label class="small muted">lockSeconds</label>
+          <input id="paramLock" type="number" placeholder="seconds" />
+          <label class="small muted">minTx (units, smallest token units)</label>
+          <input id="paramMinTx" type="number" placeholder="e.g. 20000000 for 20 USDT (6 decimals)" />
+          <label class="small muted">capX</label>
+          <input id="paramCapX" type="number" placeholder="e.g. 3" />
+          <div class="row">
+            <button id="btnSetParams" class="btn-primary">Set Params</button>
+            <button id="btnLoadParams" class="btn-primary">Load Current Params</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: quick utilities & user lookup -->
+    <div>
+      <div class="card">
+        <h2>Owner / Fee Collector</h2>
+        <div class="small muted">Owner and fee collector addresses</div>
+        <div style="margin-top:8px"><b>Owner:</b> <span id="ownerDisplay">-</span></div>
+        <div style="margin-top:6px"><b>Fee Collector:</b> <span id="feeCollectorDisplay">-</span></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>Quick User Lookup</h2>
+        <div class="small muted">Check user staking & team</div>
+        <input id="lookupAddress" type="text" placeholder="0x..." />
+        <div class="row">
+          <button id="btnLookup" class="btn-primary">Lookup</button>
+        </div>
+
+        <div id="lookupResult" style="margin-top:10px" class="small muted">No user selected.</div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>Config & Diagnostics</h2>
+        <div class="small muted">Network / provider</div>
+        <div style="margin-top:8px" id="diag"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>Admin panel — Testnet/dev only. Use owner account to perform admin actions.</footer>
 
   <script>
-    const CONTRACT_ADDRESS = "0x3aF2c75A4723b2139EB803bf5d558e7d43991D6E"; 
-    const TOKEN_ADDRESS = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; 
+  // ---------------- CONFIG ----------------
+  const STAKING_ADDRESS = "0x12488f70eb36059941b7b12DB97cB44Ac22e2998"; // <- set your staking contract address
+  const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // <- token address (USDT mock)
+  let TOKEN_DECIMALS = 6;
 
-    let provider, signer, contract, token, account;
+  // Minimal ABI (subset) built from your ABI: functions used by admin
+  const STAKING_ABI = [
+    "function owner() view returns (address)",
+    "function feeCollector() view returns (address)",
+    "function totalStaked() view returns (uint256)",
+    "function totalRewards() view returns (uint256)",
+    "function token() view returns (address)",
+    "function withdrawRequestsCount() view returns (uint256)",
+    "function getWithdrawRequest(uint256) view returns (address user,uint256 amount,uint256 timestamp,uint8 status)",
+    "function approveWithdrawal(uint256) external",
+    "function emergencyWithdraw(address to,uint256 amountUnits) external",
+    "function mint(address to,uint256 amountUnits) external returns (bool)",
+    "function transferOwnership(address newOwner) external",
+    "function setFeeCollector(address fc) external",
+    "function setParams(uint256,uint256,uint256,uint256) external",
+    "function roiBP() view returns (uint256)",
+    "function lockSeconds() view returns (uint256)",
+    "function minTx() view returns (uint256)",
+    "function capX() view returns (uint256)",
+    "function getUserInfo(address) view returns (uint256 staked,uint256 lastAction,address referrer,uint256 totalEarned,uint256 pending)",
+    "function getDirectRefs(address) view returns (address[])",
+    "function directCount(address) view returns (uint256)",
+  ];
 
-    // ✅ Staking Contract ABI (shortened for Admin functions only)
-    const CONTRACT_ABI = [
-      "function owner() view returns(address)",
-      "function roiBP() view returns(uint256)",
-      "function lockSeconds() view returns(uint256)",
-      "function minTx() view returns(uint256)",
-      "function capX() view returns(uint256)",
-      "function totalStaked() view returns(uint256)",
-      "function totalRewards() view returns(uint256)",
-      "function setParams(uint256,uint256,uint256,uint256) external",
-      "function emergencyWithdraw(address,uint256) external",
-      "event ParamsUpdated(uint256,uint256,uint256,uint256)"
-    ];
+  const TOKEN_ABI = [
+    "function decimals() view returns (uint8)",
+    "function balanceOf(address) view returns (uint256)"
+  ];
 
-    const TOKEN_ABI = [
-      "function mint(address to,uint256 amount) external"
-    ];
+  // ---------- app state ----------
+  let provider, signer, stakingContract, tokenContract, adminAccount;
 
-    async function connectWallet(){
-      if(window.ethereum){
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
-        account = await signer.getAddress();
-        document.getElementById("walletAddress").innerText = "Wallet: " + account;
-        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-        checkOwner();
-        refreshStats();
-      } else {
-        alert("Please install MetaMask!");
+  // ---------- helpers ----------
+  function toFixedNumber(num, decimals=6) {
+    if (isNaN(num)) return "0.000000";
+    return Number(num).toFixed(decimals);
+  }
+  function fromUnits(valueBn) {
+    try { return Number(ethers.utils.formatUnits(valueBn, TOKEN_DECIMALS)); }
+    catch (e) { return Number(valueBn) / (10 ** TOKEN_DECIMALS); }
+  }
+  function toUnitsFloat(num) {
+    try { return ethers.utils.parseUnits(String(num), TOKEN_DECIMALS); }
+    catch (e) { return ethers.BigNumber.from(String(Math.floor(Number(num) * (10**TOKEN_DECIMALS)))) }
+  }
+  function timestampToString(ts) {
+    try { return new Date(Number(ts) * 1000).toLocaleString(); } catch(e) { return String(ts); }
+  }
+
+  // ---------------- connect ----------------
+  async function connect() {
+    try {
+      if (!window.ethereum) { alert("MetaMask not found"); return; }
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      adminAccount = await signer.getAddress();
+      document.getElementById("adminAddr").innerText = adminAccount;
+
+      stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+      tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+
+      // token decimals
+      try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch(e){ console.warn("decimals read failed, using 6"); TOKEN_DECIMALS = 6; }
+
+      document.getElementById("contractAddr").innerText = STAKING_ADDRESS;
+      document.getElementById("tokenAddr").innerText = TOKEN_ADDRESS;
+
+      const network = await provider.getNetwork();
+      document.getElementById("networkDisplay").innerText = network.name || network.chainId;
+
+      await loadOwnerAndFeeCollector();
+      await refreshSummary();
+      log("Connected as " + adminAccount);
+    } catch (e) {
+      console.error("connect error", e);
+      alert("Connect failed: " + (e.message || e));
+    }
+  }
+  document.getElementById("connectBtn").addEventListener("click", connect);
+
+  // ---------------- summary ----------------
+  async function refreshSummary() {
+    if (!stakingContract) return;
+    try {
+      const [tStaked, tRewards, tokenAddr] = await Promise.all([
+        stakingContract.totalStaked(),
+        stakingContract.totalRewards(),
+        stakingContract.token()
+      ]);
+      document.getElementById("totalStaked").innerText = toFixedNumber(fromUnits(tStaked),6) + " USDT";
+      document.getElementById("totalRewards").innerText = toFixedNumber(fromUnits(tRewards),6) + " USDT";
+
+      // contract token balance
+      const bal = await tokenContract.balanceOf(STAKING_ADDRESS);
+      document.getElementById("contractTokenBal").innerText = toFixedNumber(fromUnits(bal),6) + " USDT";
+      log("Summary refreshed");
+    } catch (e) {
+      console.error("refreshSummary error", e);
+      alert("Failed to refresh summary: " + (e.message || e));
+    }
+  }
+  document.getElementById("refreshSummary").addEventListener("click", refreshSummary);
+  document.getElementById("btnRefreshBal").addEventListener("click", refreshSummary);
+
+  // ---------------- owner & feeCollector ----------------
+  async function loadOwnerAndFeeCollector() {
+    if (!stakingContract) return;
+    try {
+      const [owner, fc] = await Promise.all([stakingContract.owner(), stakingContract.feeCollector()]);
+      document.getElementById("ownerDisplay").innerText = owner;
+      document.getElementById("feeCollectorDisplay").innerText = fc;
+      document.getElementById("ownerAddr").innerText = "Owner: " + owner;
+    } catch (e) {
+      console.warn("loadOwnerAndFeeCollector", e);
+    }
+  }
+  document.getElementById("btnReloadOwner")?.addEventListener("click", loadOwnerAndFeeCollector);
+
+  // ---------------- withdraw requests ----------------
+  async function loadWithdrawRequests() {
+    if (!stakingContract) { alert("Connect first"); return; }
+    try {
+      const countBn = await stakingContract.withdrawRequestsCount();
+      const count = Number(countBn.toString());
+      if (count === 0) {
+        document.getElementById("withdrawsWrapper").innerText = "No withdraw requests.";
+        return;
       }
-    }
-
-    async function checkOwner(){
-      const owner = await contract.owner();
-      if(owner.toLowerCase() === account.toLowerCase()){
-        document.getElementById("adminStatus").innerText = "✅ You are the Admin";
-      } else {
-        document.getElementById("adminStatus").innerText = "❌ Not an Admin Wallet";
+      let html = `<table><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Timestamp</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+      // load latest requests (from 1..count)
+      for (let i = 1; i <= count; i++) {
+        try {
+          const r = await stakingContract.getWithdrawRequest(i);
+          // getWithdrawRequest returns (user, amount, timestamp, status)
+          const user = r[0];
+          const amount = fromUnits(r[1] || 0);
+          const ts = r[2] ? timestampToString(r[2]) : "-";
+          const status = Number(r[3]);
+          const statusTxt = status === 0 ? "Pending" : (status === 1 ? "Approved" : "Rejected");
+          html += `<tr>
+            <td>${i}</td>
+            <td style="word-break:break-all">${user}</td>
+            <td>${toFixedNumber(amount,6)} USDT</td>
+            <td>${ts}</td>
+            <td>${statusTxt}</td>
+            <td>${status===0? `<button data-id="${i}" class="btn-approve">Approve</button>` : '-'}</td>
+          </tr>`;
+        } catch (e) {
+          console.warn("getWithdrawRequest #" + i + " failed", e);
+        }
       }
-    }
+      html += `</tbody></table>`;
+      document.getElementById("withdrawsWrapper").innerHTML = html;
 
-    async function refreshStats(){
-      const roi = await contract.roiBP();
-      const lock = await contract.lockSeconds();
-      const minTx = await contract.minTx();
-      const capX = await contract.capX();
-      const staked = await contract.totalStaked();
-      const rewards = await contract.totalRewards();
-      document.getElementById("contractStats").innerHTML = `
-        ROI: ${roi} BP (~${roi/100}%/yr)<br>
-        Lock: ${lock} sec<br>
-        MinTx: ${(minTx/1e6).toFixed(2)} USDT<br>
-        CapX: ${capX}x<br>
-        Total Staked: ${(staked/1e6).toFixed(2)} USDT<br>
-        Total Rewards: ${(rewards/1e6).toFixed(6)} USDT
-      `;
-    }
+      // attach approve handlers
+      document.querySelectorAll(".btn-approve").forEach(btn => {
+        btn.addEventListener("click", async (ev) => {
+          const id = ev.target.getAttribute("data-id");
+          if (!confirm("Approve withdraw #" + id + " ?")) return;
+          await approveWithdraw(id);
+        });
+      });
 
-    async function updateParams(){
-      const roi = document.getElementById("roiBP").value;
-      const lock = document.getElementById("lockSec").value;
-      const minTx = document.getElementById("minTx").value * 1e6;
-      const capX = document.getElementById("capX").value;
-      const tx = await contract.setParams(roi, lock, minTx, capX);
+    } catch (e) {
+      console.error("loadWithdrawRequests error", e);
+      alert("Failed to load withdraw requests: " + (e.message || e));
+    }
+  }
+  document.getElementById("loadWithdraws").addEventListener("click", loadWithdrawRequests);
+
+  async function approveWithdraw(reqId) {
+    if (!stakingContract) { alert("Connect first"); return; }
+    try {
+      const tx = await stakingContract.approveWithdrawal(reqId);
       await tx.wait();
-      alert("Params Updated!");
-      refreshStats();
+      alert("Approved withdraw #" + reqId);
+      await loadWithdrawRequests();
+      await refreshSummary();
+    } catch (e) {
+      console.error("approveWithdraw error", e);
+      alert("Approve failed: " + (e.data?.message || e.message || e));
     }
+  }
 
-    async function emergencyWithdraw(){
-      const to = document.getElementById("emgTo").value;
-      const amt = document.getElementById("emgAmt").value * 1e6;
-      const tx = await contract.emergencyWithdraw(to, amt);
+  // ---------------- emergency withdraw ----------------
+  document.getElementById("btnEmergencyWithdraw").addEventListener("click", async () => {
+    try {
+      const to = document.getElementById("emgTo").value.trim();
+      const amount = Number(document.getElementById("emgAmount").value);
+      if (!to || !amount) { alert("Enter to address and amount"); return; }
+      const units = toUnitsFloat(amount);
+      if (!confirm(`Emergency withdraw ${amount} USDT to ${to} ?`)) return;
+      const tx = await stakingContract.emergencyWithdraw(to, units);
       await tx.wait();
-      alert("Emergency Withdraw Successful");
+      alert("Emergency withdraw executed");
+      await refreshSummary();
+    } catch (e) {
+      console.error("emergencyWithdraw error", e);
+      alert("Emergency withdraw failed: " + (e.data?.message || e.message || e));
     }
+  });
 
-    async function mintUSDT(){
-      const amt = document.getElementById("mintAmt").value * 1e6;
-      const tx = await token.mint(account, amt);
+  // ---------------- mint ----------------
+  document.getElementById("btnMint").addEventListener("click", async () => {
+    try {
+      const to = document.getElementById("mintTo").value.trim();
+      const amount = document.getElementById("mintAmount").value;
+      if (!to || !amount) { alert("Enter to and amount"); return; }
+      // amount should be in smallest units as your mint expects units — we let admin pass raw units
+      const units = ethers.BigNumber.from(String(amount));
+      const tx = await stakingContract.mint(to, units);
       await tx.wait();
-      alert("Minted " + amt/1e6 + " USDT");
+      alert("Mint tx completed");
+      await refreshSummary();
+    } catch (e) {
+      console.error("mint error", e);
+      alert("Mint failed: " + (e.data?.message || e.message || e));
     }
+  });
 
-    document.getElementById("connectBtn").addEventListener("click", connectWallet);
+  // ---------------- transfer ownership ----------------
+  document.getElementById("btnTransferOwner").addEventListener("click", async () => {
+    try {
+      const newOwner = document.getElementById("newOwner").value.trim();
+      if (!newOwner) { alert("Enter new owner address"); return; }
+      if (!confirm("Transfer contract ownership to " + newOwner + " ?")) return;
+      const tx = await stakingContract.transferOwnership(newOwner);
+      await tx.wait();
+      alert("Ownership transferred");
+      await loadOwnerAndFeeCollector();
+    } catch (e) {
+      console.error("transferOwnership error", e);
+      alert("Transfer failed: " + (e.data?.message || e.message || e));
+    }
+  });
+
+  // ---------------- set fee collector ----------------
+  document.getElementById("btnSetFeeCollector").addEventListener("click", async () => {
+    try {
+      const fc = document.getElementById("setFeeCollectorAddr").value.trim();
+      if (!fc) { alert("Enter fee collector address"); return; }
+      const tx = await stakingContract.setFeeCollector(fc);
+      await tx.wait();
+      alert("Fee collector set");
+      await loadOwnerAndFeeCollector();
+    } catch (e) {
+      console.error("setFeeCollector error", e);
+      alert("Set fee collector failed: " + (e.data?.message || e.message || e));
+    }
+  });
+
+  // ---------------- set params ----------------
+  document.getElementById("btnSetParams").addEventListener("click", async () => {
+    try {
+      const roi = Number(document.getElementById("paramRoi").value);
+      const lock = Number(document.getElementById("paramLock").value);
+      const minTx = Number(document.getElementById("paramMinTx").value);
+      const capX = Number(document.getElementById("paramCapX").value);
+      if ([roi,lock,minTx,capX].some(v => isNaN(v))) { alert("Enter numeric params"); return; }
+      const tx = await stakingContract.setParams(roi, lock, minTx, capX);
+      await tx.wait();
+      alert("Params updated");
+      await loadParams();
+    } catch (e) {
+      console.error("setParams error", e);
+      alert("Set params failed: " + (e.data?.message || e.message || e));
+    }
+  });
+
+  document.getElementById("btnLoadParams").addEventListener("click", loadParams);
+
+  async function loadParams() {
+    if (!stakingContract) return;
+    try {
+      const [roi, lock, minTx, capX] = await Promise.all([
+        stakingContract.roiBP(),
+        stakingContract.lockSeconds(),
+        stakingContract.minTx(),
+        stakingContract.capX()
+      ]);
+      document.getElementById("paramRoi").value = roi.toString();
+      document.getElementById("paramLock").value = lock.toString();
+      document.getElementById("paramMinTx").value = minTx.toString();
+      document.getElementById("paramCapX").value = capX.toString();
+      log("Params loaded");
+    } catch (e) {
+      console.error("loadParams error", e);
+    }
+  }
+
+  // ---------------- user lookup ----------------
+  document.getElementById("btnLookup").addEventListener("click", async () => {
+    try {
+      const addr = document.getElementById("lookupAddress").value.trim();
+      if (!addr) { alert("Enter address"); return; }
+      if (!stakingContract) { alert("Connect first"); return; }
+
+      const ui = await stakingContract.getUserInfo(addr);
+      const staked = fromUnits(ui[0] || 0);
+      const lastAction = ui[1] ? timestampToString(ui[1]) : "-";
+      const ref = ui[2] || "-";
+      const totalEarned = fromUnits(ui[3] || 0);
+      const pending = fromUnits(ui[4] || 0);
+
+      let html = `<div><b>Staked:</b> ${toFixedNumber(staked,6)} USDT</div>`;
+      html += `<div><b>Last Action:</b> ${lastAction}</div>`;
+      html += `<div><b>Referrer:</b> ${ref}</div>`;
+      html += `<div><b>Total Earned:</b> ${toFixedNumber(totalEarned,6)} USDT</div>`;
+      html += `<div><b>Pending ROI:</b> ${toFixedNumber(pending,6)} USDT</div>`;
+
+      // direct refs (if available)
+      try {
+        const refs = await stakingContract.getDirectRefs(addr);
+        html += `<div style="margin-top:8px"><b>Direct refs:</b> (${refs.length})</div><div style="max-height:140px;overflow:auto"><ul>`;
+        for (let r of refs) {
+          html += `<li style="word-break:break-all">${r}</li>`;
+        }
+        html += `</ul></div>`;
+      } catch(e) {
+        html += `<div class="small muted">Direct refs not available</div>`;
+      }
+
+      document.getElementById("lookupResult").innerHTML = html;
+    } catch (e) {
+      console.error("lookup error", e);
+      alert("Lookup failed: " + (e.message || e));
+    }
+  });
+
+  // ---------------- logging ----------------
+  function log(msg) {
+    const d = document.getElementById("diag");
+    const now = new Date().toLocaleTimeString();
+    d.innerHTML = `<div style="font-size:12px;color:var(--muted)">[${now}] ${msg}</div>` + d.innerHTML;
+  }
+
+  // --------------- auto UI hooks ---------------
+  window.addEventListener("load", () => {
+    document.getElementById("contractAddr").innerText = STAKING_ADDRESS;
+    document.getElementById("tokenAddr").innerText = TOKEN_ADDRESS;
+  });
+
   </script>
 </body>
 </html>
