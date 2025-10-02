@@ -292,25 +292,18 @@
 
   // ---------------- summary ----------------
   async function refreshSummary() {
-    if (!stakingContract) return;
-    try {
-      const [tStaked, tRewards, tokenAddr] = await Promise.all([
-        stakingContract.totalStaked(),
-        stakingContract.totalRewards(),
-        stakingContract.token()
-      ]);
-      document.getElementById("totalStaked").innerText = toFixedNumber(fromUnits(tStaked),6) + " USDT";
-      document.getElementById("totalRewards").innerText = toFixedNumber(fromUnits(tRewards),6) + " USDT";
-
-      // contract token balance
-      const bal = await tokenContract.balanceOf(STAKING_ADDRESS);
-      document.getElementById("contractTokenBal").innerText = toFixedNumber(fromUnits(bal),6) + " USDT";
-      log("Summary refreshed");
-    } catch (e) {
-      console.error("refreshSummary error", e);
-      alert("Failed to refresh summary: " + (e.message || e));
-    }
+  if (!stakingContract) return;
+  try {
+    const bal = await tokenContract.balanceOf(STAKING_ADDRESS);
+    document.getElementById("contractTokenBal").innerText = toFixedNumber(fromUnits(bal),6) + " USDT";
+    document.getElementById("totalStaked").innerText = "N/A";
+    document.getElementById("totalRewards").innerText = "N/A";
+  } catch (e) {
+    console.error("refreshSummary error", e);
+    alert("Failed to refresh summary: " + (e.message || e));
   }
+}
+
   document.getElementById("refreshSummary").addEventListener("click", refreshSummary);
   document.getElementById("btnRefreshBal").addEventListener("click", refreshSummary);
 
