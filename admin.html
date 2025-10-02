@@ -2,259 +2,158 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin Panel - USDT Staking</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USDT Staking — Admin Panel</title>
+  <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #0d1117;
-      color: #e6edf3;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      width: 90%;
-      max-width: 900px;
-      margin: 40px auto;
-    }
-    .card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
-    }
-    h1, h2, h3 {
-      color: #f78166;
-    }
-    button {
-      background: #8957e5;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-    button:hover {
-      background: #a371f7;
-    }
-    input {
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid #30363d;
-      margin: 5px 0;
-      width: 100%;
-      background: #0d1117;
-      color: #e6edf3;
-    }
-    .info {
-      margin: 10px 0;
-      padding: 10px;
-      background: #21262d;
-      border-radius: 8px;
-    }
+    body { background:#0d0d0d; color:#f5f5f5; font-family: Arial, sans-serif; text-align:center; }
+    h2 { margin-top:20px; }
+    button { padding:10px 18px; border:none; cursor:pointer; border-radius:6px; font-weight:bold; }
+    .yellow { background:#f5c518; color:#000; }
+    .red { background:#e63946; color:#fff; }
+    .green { background:#06d6a0; color:#000; }
+    .card { background:#1a1a1a; margin:20px auto; padding:20px; border-radius:10px; width:400px; text-align:left; }
+    input { width:100%; padding:8px; margin:5px 0; border-radius:5px; border:none; }
+    .status { margin:10px 0; font-weight:bold; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Admin Panel - USDT Staking</h1>
+  <h2>⚙️ USDT Staking — Admin Panel</h2>
+  <button id="connectBtn" class="yellow">Connect Wallet</button>
+  <div id="walletAddress">Wallet: Not Connected</div>
+  <div id="adminStatus" class="status"></div>
 
-    <div class="card">
-      <h3>Wallet</h3>
-      <button onclick="connectWallet()">Connect Admin Wallet</button>
-      <p id="walletAddress">Not connected</p>
-      <p id="isOwner">Checking ownership...</p>
-    </div>
+  <!-- Contract Stats -->
+  <div class="card">
+    <h3>📊 Contract Stats</h3>
+    <div id="contractStats">-</div>
+    <button onclick="refreshStats()" class="green">Refresh Stats</button>
+  </div>
 
-    <div class="card">
-      <h3>Global Stats</h3>
-      <button onclick="loadStats()">Load Stats</button>
-      <div id="stats"></div>
-    </div>
+  <!-- Update Params -->
+  <div class="card">
+    <h3>🔧 Update Parameters</h3>
+    <input id="roiBP" placeholder="ROI BP (e.g. 1800)">
+    <input id="lockSec" placeholder="Lock Period (sec)">
+    <input id="minTx" placeholder="MinTx (USDT)">
+    <input id="capX" placeholder="CapX (e.g. 3)">
+    <button onclick="updateParams()" class="yellow">Update Params</button>
+  </div>
 
-    <div class="card">
-      <h3>Update Parameters</h3>
-      <input id="roi" placeholder="ROI (Basis Points)">
-      <input id="lock" placeholder="Lock Period (seconds)">
-      <input id="minTx" placeholder="Minimum Tx (in smallest unit)">
-      <input id="capX" placeholder="Cap Multiplier (e.g. 3)">
-      <button onclick="updateParams()">Update Params</button>
-    </div>
+  <!-- Withdrawal Requests -->
+  <div class="card">
+    <h3>💸 Pending Withdrawals</h3>
+    <div id="withdrawList">No pending requests</div>
+  </div>
 
-    <div class="card">
-      <h3>Emergency Withdraw</h3>
-      <input id="to" placeholder="To Address">
-      <input id="amt" placeholder="Amount (USDT)">
-      <button onclick="emergencyWithdraw()">Withdraw</button>
-    </div>
+  <!-- Emergency Withdraw -->
+  <div class="card">
+    <h3>🚨 Emergency Withdraw</h3>
+    <input id="emgTo" placeholder="Recipient Address">
+    <input id="emgAmt" placeholder="Amount (USDT)">
+    <button onclick="emergencyWithdraw()" class="red">Execute</button>
+  </div>
 
-    <div class="card">
-      <h3>Transfer Ownership</h3>
-      <input id="newOwner" placeholder="New Owner Address">
-      <button onclick="transferOwnership()">Transfer</button>
-    </div>
-
-    <!-- ✅ MINT USDT (Admin Only) -->
-    <div class="card">
-      <h3>Mint Test USDT (Owner Only)</h3>
-      <input id="mintTo" placeholder="Wallet Address">
-      <input id="mintAmt" placeholder="Amount (USDT)">
-      <button onclick="mintUSDT()">Mint</button>
-      <button onclick="mintToSelf()">Mint to My Wallet</button>
-    </div>
-
-    <div class="card">
-      <h3>Referral Monitor</h3>
-      <input id="checkUser" placeholder="User Wallet Address">
-      <button onclick="getUserInfo()">Check User Info</button>
-      <div id="userData"></div>
-    </div>
+  <!-- Mint (Testnet only) -->
+  <div class="card">
+    <h3>🪙 Mint USDT (Testnet only)</h3>
+    <input id="mintAmt" placeholder="Amount (USDT)">
+    <button onclick="mintUSDT()" class="yellow">Mint</button>
   </div>
 
   <script>
-    const tokenAddress = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // ✅ USDT Token
-    const stakingAddress = "0xC762eA92B653aCc0C752C90AD44e026980551c60"; // ✅ Staking Contract
+    const CONTRACT_ADDRESS = "0x3aF2c75A4723b2139EB803bf5d558e7d43991D6E"; 
+    const TOKEN_ADDRESS = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; 
 
-    const stakingABI = [
-      {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[
-        {"internalType":"uint256","name":"staked","type":"uint256"},
-        {"internalType":"uint256","name":"lastAction","type":"uint256"},
-        {"internalType":"address","name":"referrer","type":"address"},
-        {"internalType":"uint256","name":"totalEarned","type":"uint256"},
-        {"internalType":"uint256","name":"pending","type":"uint256"}
-      ],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"totalRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-      {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-      {"inputs":[{"internalType":"uint256","name":"_roiBP","type":"uint256"},{"internalType":"uint256","name":"_lockSeconds","type":"uint256"},{"internalType":"uint256","name":"_minTx","type":"uint256"},{"internalType":"uint256","name":"_capX","type":"uint256"}],"name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}
+    let provider, signer, contract, token, account;
+
+    // ✅ Staking Contract ABI (shortened for Admin functions only)
+    const CONTRACT_ABI = [
+      "function owner() view returns(address)",
+      "function roiBP() view returns(uint256)",
+      "function lockSeconds() view returns(uint256)",
+      "function minTx() view returns(uint256)",
+      "function capX() view returns(uint256)",
+      "function totalStaked() view returns(uint256)",
+      "function totalRewards() view returns(uint256)",
+      "function setParams(uint256,uint256,uint256,uint256) external",
+      "function emergencyWithdraw(address,uint256) external",
+      "event ParamsUpdated(uint256,uint256,uint256,uint256)"
     ];
 
-    const tokenABI = [
-      {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}
+    const TOKEN_ABI = [
+      "function mint(address to,uint256 amount) external"
     ];
 
-    let provider, signer, stakingContract, tokenContract, currentAccount;
-
-    async function connectWallet() {
-      try {
-        if (!window.ethereum) throw new Error("No wallet found");
+    async function connectWallet(){
+      if(window.ethereum){
         provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
-        currentAccount = await signer.getAddress();
-        document.getElementById("walletAddress").innerText = "Connected: " + currentAccount;
-
-        stakingContract = new ethers.Contract(stakingAddress, stakingABI, signer);
-        tokenContract = new ethers.Contract(tokenAddress, tokenABI, signer);
-
-        let owner = await stakingContract.owner();
-        if (owner.toLowerCase() === currentAccount.toLowerCase()) {
-          document.getElementById("isOwner").innerText = "✅ You are the Owner";
-        } else {
-          document.getElementById("isOwner").innerText = "❌ Not Owner Wallet (Mint disabled)";
-        }
-      } catch (err) {
-        console.error("Wallet connect failed:", err);
-        alert("Wallet connect failed: " + err.message);
+        account = await signer.getAddress();
+        document.getElementById("walletAddress").innerText = "Wallet: " + account;
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+        checkOwner();
+        refreshStats();
+      } else {
+        alert("Please install MetaMask!");
       }
     }
 
-    async function loadStats() {
-      let staked = await stakingContract.totalStaked();
-      let rewards = await stakingContract.totalRewards();
-      document.getElementById("stats").innerHTML = `
-        <p><b>Total Staked:</b> ${ethers.utils.formatUnits(staked, 6)} USDT</p>
-        <p><b>Total Rewards Paid:</b> ${ethers.utils.formatUnits(rewards, 6)} USDT</p>
+    async function checkOwner(){
+      const owner = await contract.owner();
+      if(owner.toLowerCase() === account.toLowerCase()){
+        document.getElementById("adminStatus").innerText = "✅ You are the Admin";
+      } else {
+        document.getElementById("adminStatus").innerText = "❌ Not an Admin Wallet";
+      }
+    }
+
+    async function refreshStats(){
+      const roi = await contract.roiBP();
+      const lock = await contract.lockSeconds();
+      const minTx = await contract.minTx();
+      const capX = await contract.capX();
+      const staked = await contract.totalStaked();
+      const rewards = await contract.totalRewards();
+      document.getElementById("contractStats").innerHTML = `
+        ROI: ${roi} BP (~${roi/100}%/yr)<br>
+        Lock: ${lock} sec<br>
+        MinTx: ${(minTx/1e6).toFixed(2)} USDT<br>
+        CapX: ${capX}x<br>
+        Total Staked: ${(staked/1e6).toFixed(2)} USDT<br>
+        Total Rewards: ${(rewards/1e6).toFixed(6)} USDT
       `;
     }
 
-    async function updateParams() {
-      let roi = document.getElementById("roi").value;
-      let lock = document.getElementById("lock").value;
-      let minTx = document.getElementById("minTx").value;
-      let capX = document.getElementById("capX").value;
-      let tx = await stakingContract.setParams(roi, lock, minTx, capX);
+    async function updateParams(){
+      const roi = document.getElementById("roiBP").value;
+      const lock = document.getElementById("lockSec").value;
+      const minTx = document.getElementById("minTx").value * 1e6;
+      const capX = document.getElementById("capX").value;
+      const tx = await contract.setParams(roi, lock, minTx, capX);
       await tx.wait();
-      alert("Params updated");
+      alert("Params Updated!");
+      refreshStats();
     }
 
-    async function emergencyWithdraw() {
-      let to = document.getElementById("to").value;
-      let amt = document.getElementById("amt").value;
-      let decimals = 6;
-      let amount = ethers.utils.parseUnits(amt, decimals);
-      let tx = await stakingContract.emergencyWithdraw(to, amount);
+    async function emergencyWithdraw(){
+      const to = document.getElementById("emgTo").value;
+      const amt = document.getElementById("emgAmt").value * 1e6;
+      const tx = await contract.emergencyWithdraw(to, amt);
       await tx.wait();
-      alert("Emergency Withdraw done");
+      alert("Emergency Withdraw Successful");
     }
 
-    async function transferOwnership() {
-      let newOwner = document.getElementById("newOwner").value;
-      let tx = await stakingContract.transferOwnership(newOwner);
+    async function mintUSDT(){
+      const amt = document.getElementById("mintAmt").value * 1e6;
+      const tx = await token.mint(account, amt);
       await tx.wait();
-      alert("Ownership transferred");
+      alert("Minted " + amt/1e6 + " USDT");
     }
 
-    async function mintUSDT() {
-      try {
-        let owner = await stakingContract.owner();
-        if (owner.toLowerCase() !== currentAccount.toLowerCase()) {
-          return alert("❌ Only owner can mint USDT");
-        }
-        let to = document.getElementById("mintTo").value;
-        let amt = document.getElementById("mintAmt").value;
-        if (!to || !amt) return alert("Enter address and amount");
-
-        let decimals = await tokenContract.decimals();
-        let amount = ethers.utils.parseUnits(amt, decimals);
-
-        let tx = await tokenContract.mint(to, amount);
-        await tx.wait();
-        alert("✅ Minted " + amt + " USDT to " + to);
-      } catch (err) {
-        console.error("Mint failed:", err);
-        alert("Mint failed: " + err.message);
-      }
-    }
-
-    async function mintToSelf() {
-      try {
-        let owner = await stakingContract.owner();
-        if (owner.toLowerCase() !== currentAccount.toLowerCase()) {
-          return alert("❌ Only owner can mint USDT");
-        }
-        let amt = document.getElementById("mintAmt").value;
-        if (!amt) return alert("Enter amount");
-
-        let decimals = await tokenContract.decimals();
-        let amount = ethers.utils.parseUnits(amt, decimals);
-
-        let tx = await tokenContract.mint(currentAccount, amount);
-        await tx.wait();
-        alert("✅ Minted " + amt + " USDT to your wallet");
-      } catch (err) {
-        console.error("Mint failed:", err);
-        alert("Mint failed: " + err.message);
-      }
-    }
-
-    async function getUserInfo() {
-      let userAddr = document.getElementById("checkUser").value;
-      let info = await stakingContract.getUserInfo(userAddr);
-      document.getElementById("userData").innerHTML = `
-        <p><b>Staked:</b> ${ethers.utils.formatUnits(info.staked, 6)} USDT</p>
-        <p><b>Total Earned:</b> ${ethers.utils.formatUnits(info.totalEarned, 6)} USDT</p>
-        <p><b>Pending Rewards:</b> ${ethers.utils.formatUnits(info.pending, 6)} USDT</p>
-        <p><b>Referrer:</b> ${info.referrer}</p>
-        <p><b>Last Action:</b> ${new Date(info.lastAction * 1000).toLocaleString()}</p>
-      `;
-    }
+    document.getElementById("connectBtn").addEventListener("click", connectWallet);
   </script>
 </body>
 </html>
