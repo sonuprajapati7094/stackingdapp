@@ -202,6 +202,20 @@
   const STAKING_ADDRESS = "0x12488f70eb36059941b7b12DB97cB44Ac22e2998"; // new staking address
   const TOKEN_ADDRESS   = "0xEbA5032Be8fc2d2a2fa29e134853ab6aAA12fa1C"; // token (mock USDT)
   let TOKEN_DECIMALS = 6; // default; will be overwritten by on-chain call if available
+  // --------- parse referral from URL & persist ----------
+const URL_PARAMS = new URLSearchParams(window.location.search);
+let URL_REF = null;
+try {
+  const maybeRef = URL_PARAMS.get('ref');
+  if (maybeRef && ethers.utils.isAddress(maybeRef)) {
+    URL_REF = maybeRef;
+    localStorage.setItem('staking_ref', URL_REF); // persist for future deposits
+    console.log("Referral from URL saved:", URL_REF);
+  }
+} catch (e) {
+  URL_REF = null;
+}
+
 
   // ----------------- ABI (staking contract's ABI embedded) -----------------
   const STAKING_ABI = [
@@ -905,43 +919,61 @@
   }
 
   // ----------------- connect wallet -----------------
-  async function connect() {
-    try {
-      if (!window.ethereum) { alert("MetaMask not found"); return; }
-      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-      await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
-      account = await signer.getAddress();
-      document.getElementById("walletDisplay").innerText = account;
-      // init contracts
-      stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-      tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-
-      // read decimals (USDT usually 6)
-      try {
-        TOKEN_DECIMALS = await tokenContract.decimals();
-      } catch (e) {
-        // some mock tokens don't expose decimals; keep default 6
-        console.warn("Couldn't read token decimals, using default", TOKEN_DECIMALS);
-      }
-
-      // set referral link value
-      document.getElementById("referralInput").value = window.location.origin + window.location.pathname + "?ref=" + account;
-
-      // store connected
-      localStorage.setItem("staking_connected", account);
-
-      // initial refresh
-      await refreshAll();
-
-      // start event listeners (withdraws, deposits, claims)
-      listenEvents();
-
-    } catch (err) {
-      console.error("connect error", err);
-      alert("Connect failed: " + (err.message || err));
+  // ----------------- connect wallet -----------------
+async function connect() {
+  try {
+    if (!window.ethereum) { 
+      alert("MetaMask not found"); 
+      return; 
     }
+
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    await provider.send("eth_requestAccounts", []);
+    signer = provider.getSigner();
+    account = await signer.getAddress();
+    document.getElementById("walletDisplay").innerText = account;
+
+    // init contracts
+    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+    tokenContract   = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+
+    // read decimals (USDT usually 6)
+    try {
+      TOKEN_DECIMALS = await tokenContract.decimals();
+    } catch (e) {
+      console.warn("Couldn't read token decimals, using default", TOKEN_DECIMALS);
+    }
+
+    // ---------- Referral handling ----------
+    // 1) Set personal referral link for current user
+    document.getElementById("referralInput").value = 
+      window.location.origin + window.location.pathname + "?ref=" + account;
+
+    // 2) Persist incoming referral if URL had ?ref=
+    try {
+      if (!localStorage.getItem('staking_ref') && typeof URL_REF !== "undefined" && URL_REF) {
+        localStorage.setItem("staking_ref", URL_REF);
+        console.log("Persisted referral from URL:", URL_REF);
+      }
+    } catch (err) {
+      console.warn("Referral persist error", err);
+    }
+
+    // ---------- Store connected wallet ----------
+    localStorage.setItem("staking_connected", account);
+
+    // initial refresh
+    await refreshAll();
+
+    // start event listeners (withdraws, deposits, claims)
+    listenEvents();
+
+  } catch (err) {
+    console.error("connect error", err);
+    alert("Connect failed: " + (err.message || err));
   }
+}
+
 
   document.getElementById("connectBtn").addEventListener("click", connect);
 
@@ -976,19 +1008,31 @@
       document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
       document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
 
-     // --- compute Days to 3x with daily ROI 0.6% (18% monthly) ---
+     // --- compute days to 3x using project daily rate (0.6% per day => ~18% monthly) ---
+const dailyRate = 0.006; // 0.6% per day
 let daysTo3x = 0;
-if (staked > 0) {
-    const dailyRate = 0.006; // 0.6% per day
-    const dailyReward = staked * dailyRate;
-
-    const already = totalEarned + pending;
-    const remaining = Math.max((staked * 3) - already, 0.0);
-
-    daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
+if (staked > 0 && dailyRate > 0) {
+  const dailyReward = staked * dailyRate; // reward in displayed units per day
+  const already = totalEarned + pending; // what's already earned (credited) + pending
+  const remaining = Math.max((staked * 3) - already, 0.0);
+  daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
 }
 document.getElementById("days3x").innerText = (daysTo3x > 0 ? daysTo3x : "0") + " days";
 document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
+
+// read instant & level incomes from contract (if available)
+let instantVal = 0, levelVal = 0;
+try {
+  const inst = await stakingContract.instantIncome(account);
+  const lev = await stakingContract.levelIncome(account);
+  instantVal = fromUnits(inst || 0);
+  levelVal = fromUnits(lev || 0);
+} catch (e) {
+  console.warn("instant/level read failed", e);
+}
+// update UI
+document.getElementById("instantIncome").innerText = toFixedNumber(instantVal,6) + " USDT";
+document.getElementById("levelIncome").innerText = toFixedNumber(levelVal,6) + " USDT";
 
 
       // 3) pendingRewards direct call to ensure freshest value
@@ -1056,44 +1100,177 @@ document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inacti
   document.getElementById("quickApproveBtn").addEventListener("click", approveQuick);
 
   async function stake() {
-    try {
-      if (!stakingContract || !signer) { alert("Connect first"); return; }
-      let amtStr = document.getElementById("stakeAmount").value;
-      if (!amtStr || Number(amtStr) <= 0) { alert("Enter stake amount"); return; }
-      const amt = Number(amtStr);
-      if (amt < 20 || (amt % 20) !== 0) { alert("Stake must be at least 20 USDT and multiple of 20"); return; }
-
-      const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-      const tx = await stakingContract.deposit(units, ethers.constants.AddressZero);
-      await tx.wait();
-      alert("Deposit successful");
-      await refreshAll();
-    } catch (e) {
-      console.error("stake error", e);
-      alert("Stake failed: " + (e.data?.message || e.message || e));
+  try {
+    if (!stakingContract || !signer) { 
+      alert("Connect wallet first"); 
+      return; 
     }
+
+    let amtStr = document.getElementById("stakeAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) { 
+      alert("Enter stake amount"); 
+      return; 
+    }
+
+    const amt = Number(amtStr);
+    if (amt < 20 || (amt % 20) !== 0) { 
+      alert("Stake must be at least 20 USDT and multiple of 20"); 
+      return; 
+    }
+
+    // convert to smallest units
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // ---------- resolve referrer ----------
+    let referrer = ethers.constants.AddressZero;
+    try {
+      // priority 1: stored referral in localStorage
+      const storedRef = localStorage.getItem("staking_ref");
+      if (storedRef && ethers.utils.isAddress(storedRef)) {
+        referrer = storedRef;
+      }
+
+      // priority 2: URL param ?ref= if still present
+      if (typeof URL_REF !== "undefined" && URL_REF && ethers.utils.isAddress(URL_REF)) {
+        referrer = URL_REF;
+      }
+
+      // priority 3: fallback → owner (default referrer)
+      if (!referrer || referrer === ethers.constants.AddressZero) {
+        referrer = await stakingContract.owner();
+      }
+    } catch (e) {
+      console.warn("referrer resolution failed, fallback owner", e);
+      referrer = await stakingContract.owner();
+    }
+
+    console.log("Using referrer:", referrer);
+
+    // call deposit
+    const tx = await stakingContract.deposit(units, referrer);
+    await tx.wait();
+
+    alert("Deposit successful ✅");
+    await refreshAll();
+
+  } catch (e) {
+    console.error("stake error", e);
+    alert("Stake failed: " + (e.data?.message || e.message || e));
   }
+}
+
+document.getElementById("stakeBtn").addEventListener("click", stake);
+
+  
   document.getElementById("stakeBtn").addEventListener("click", stake);
 
   async function withdraw() {
-    try {
-      if (!stakingContract || !signer) { alert("Connect first"); return; }
-      const amtStr = document.getElementById("withdrawAmount").value;
-      if (!amtStr || Number(amtStr) <= 0) { alert("Enter withdraw amount"); return; }
-      const amt = Number(amtStr);
-      if (amt < 10 || (amt % 10) !== 0) { alert("Withdraw must be at least 10 USDT and multiple of 10"); return; }
-
-      const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-      const tx = await stakingContract.withdrawPrincipal(units);
-      await tx.wait();
-      document.getElementById("withdrawStatus").innerText = "Withdraw request processed (check blockchain).";
-      await refreshAll();
-    } catch (e) {
-      console.error("withdraw error", e);
-      alert("Withdraw failed: " + (e.data?.message || e.message || e));
+  try {
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
     }
+
+    const amtStr = document.getElementById("withdrawAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter withdraw amount");
+      return;
+    }
+
+    const amt = Number(amtStr);
+    if (amt < 10 || (amt % 10) !== 0) {
+      alert("Withdraw must be at least 10 USDT and in multiples of 10");
+      return;
+    }
+
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // Try to read available income from contract (if provided)
+    let availableUnits = null;
+    try {
+      if (typeof stakingContract.incomeAvailable === "function") {
+        availableUnits = await stakingContract.incomeAvailable(account);
+      } else if (typeof stakingContract.incomeAvailable !== "undefined") {
+        // still try (some ABIs expose but typeof may differ)
+        availableUnits = await stakingContract.incomeAvailable(account);
+      } else if (typeof stakingContract.instantIncome === "function" || typeof stakingContract.levelIncome === "function") {
+        // fallback: sum instant + level if those exist
+        const inst = typeof stakingContract.instantIncome === "function"
+                      ? await stakingContract.instantIncome(account)
+                      : ethers.BigNumber.from(0);
+        const lvl = typeof stakingContract.levelIncome === "function"
+                      ? await stakingContract.levelIncome(account)
+                      : ethers.BigNumber.from(0);
+        availableUnits = ethers.BigNumber.from(inst).add(lvl);
+      }
+    } catch (readErr) {
+      console.warn("Could not read incomeAvailable / instant/level from contract:", readErr);
+      availableUnits = null;
+    }
+
+    if (availableUnits) {
+      // ensure availableUnits is BigNumber
+      const bnUnits = ethers.BigNumber.from(units);
+      const bnAvail = ethers.BigNumber.from(availableUnits);
+      if (bnUnits.gt(bnAvail)) {
+        const availDisplay = Number(ethers.utils.formatUnits(bnAvail, TOKEN_DECIMALS));
+        alert("Insufficient available income. Available: " + toFixedNumber(availDisplay, 6) + " USDT");
+        return;
+      }
+    }
+
+    // Decide which method to call
+    let methodToCall = null;
+    if (typeof stakingContract.requestWithdraw === "function") {
+      methodToCall = "requestWithdraw"; // preferred: creates pending withdraw for admin approval
+    } else if (typeof stakingContract.withdrawPrincipal === "function") {
+      methodToCall = "withdrawPrincipal"; // fallback (this withdraws principal, not income)
+    } else if (typeof stakingContract.withdraw === "function") {
+      methodToCall = "withdraw";
+    } else {
+      alert("Contract does not expose a requestWithdraw/withdrawPrincipal function. Check ABI.");
+      return;
+    }
+
+    // UX: show status
+    document.getElementById("withdrawStatus").innerText = "Submitting withdraw request...";
+
+    // Call the chosen method
+    let tx;
+    if (methodToCall === "requestWithdraw") {
+      tx = await stakingContract.requestWithdraw(units);
+    } else {
+      // warn user if fallback to withdrawPrincipal
+      const ok = confirm("Contract only exposes withdrawPrincipal (this typically withdraws staked principal, not income). Proceed?");
+      if (!ok) {
+        document.getElementById("withdrawStatus").innerText = "Withdraw cancelled.";
+        return;
+      }
+      tx = await stakingContract.withdrawPrincipal(units);
+    }
+
+    await tx.wait();
+
+    // success UI
+    if (methodToCall === "requestWithdraw") {
+      document.getElementById("withdrawStatus").innerText = "Withdraw request submitted (pending admin approval).";
+    } else {
+      document.getElementById("withdrawStatus").innerText = "Withdraw executed on-chain.";
+    }
+
+    // refresh UI values
+    await refreshAll();
+
+  } catch (e) {
+    console.error("withdraw error", e);
+    // try to extract readable message
+    const reason = e?.data?.message || e?.reason || e?.message || String(e);
+    alert("Withdraw failed: " + reason);
+    document.getElementById("withdrawStatus").innerText = "Withdraw failed: " + (reason?.slice?.(0,120) || reason);
   }
-  document.getElementById("withdrawBtn").addEventListener("click", withdraw);
+}
+
+document.getElementById("withdrawBtn").addEventListener("click", withdraw);
 
   // ----------------- events reading for histories (lightweight) -----------------
   async function loadRecentEvents() {
@@ -1129,25 +1306,29 @@ document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inacti
   }
 
   // Listen to Deposit/Claim/Withdraw events to auto-refresh UI
-  function listenEvents() {
-    try {
-      if (!stakingContract) return;
-      stakingContract.on("Deposit", (user, amount, referrer, event) => {
-        console.log("Deposit event", user, amount.toString());
-        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-      });
-      stakingContract.on("Claim", (user, reward, event) => {
-        console.log("Claim event", user, reward.toString());
-        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-      });
-      stakingContract.on("Withdraw", (user, amount, event) => {
-        console.log("Withdraw event", user, amount.toString());
-        if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-      });
-    } catch (e) {
-      console.warn("listenEvents", e);
-    }
+function listenEvents() {
+  try {
+    if (!stakingContract) return;
+    stakingContract.on("Deposit", (user, amount, referrer, event) => {
+      console.log("Deposit event", user, amount.toString(), referrer);
+      // refresh if I am depositor OR I am the referrer (I should see instant income)
+      if ((user && user.toLowerCase() === account.toLowerCase()) || (referrer && referrer.toLowerCase() === account.toLowerCase())) {
+        refreshAll();
+      }
+    });
+    stakingContract.on("Claim", (user, reward, event) => {
+      console.log("Claim event", user, reward.toString());
+      if (user && user.toLowerCase() === account.toLowerCase()) refreshAll();
+    });
+    stakingContract.on("Withdraw", (user, amount, event) => {
+      console.log("Withdraw event", user, amount.toString());
+      if (user && user.toLowerCase() === account.toLowerCase()) refreshAll();
+    });
+  } catch (e) {
+    console.warn("listenEvents", e);
   }
+}
+
 
   // ----------------- referral copy / show team (placeholder) -----------------
   document.getElementById("copyRefBtn").addEventListener("click", async () => {
@@ -1160,6 +1341,44 @@ document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inacti
   document.getElementById("showTeamBtn").addEventListener("click", async () => {
     alert("Team view: currently requires building off-chain index from Deposit events. Will add soon.");
   });
+  document.getElementById("showTeamBtn").addEventListener("click", displayTeam);
+async function displayTeam() {
+  if (!stakingContract || !account) { alert("Connect wallet first"); return; }
+  try {
+    const refs = await stakingContract.getDirectRefs(account);
+    // create/update a small container under referral card
+    const containerId = "teamListContainer";
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement("div");
+      container.id = containerId;
+      container.style.marginTop = "10px";
+      container.style.maxHeight = "260px";
+      container.style.overflowY = "auto";
+      container.style.background = "var(--panel)";
+      container.style.padding = "10px";
+      container.style.borderRadius = "8px";
+      document.querySelector(".left").appendChild(container);
+    }
+    if (!refs || refs.length === 0) {
+      container.innerHTML = "<div class='sm muted'>No direct refs found.</div>";
+      return;
+    }
+    let html = "<table style='width:100%;font-size:13px;'><tr><th>Address</th><th>Staked</th></tr>";
+    for (let i=0;i<refs.length;i++){
+      const r = refs[i];
+      const info = await stakingContract.getUserInfo(r);
+      const st = fromUnits(info.staked || 0);
+      html += `<tr><td class='sm'>${r}</td><td>${toFixedNumber(st,6)} USDT</td></tr>`;
+    }
+    html += "</table>";
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("displayTeam error", e);
+    alert("Could not load team: " + (e.message || e));
+  }
+}
+
 
   // ----------------- small helpers -----------------
   window.openExternal = (url) => window.open(url, "_blank");
