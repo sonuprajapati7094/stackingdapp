@@ -159,6 +159,37 @@
             <div class="value" id="activeCounts">0 / 0</div>
           </div>
         </div>
+        <div class="card">
+  <h2>My Team</h2>
+  <h3 style="margin-bottom:8px; color:#ffd86b;">Direct Team</h3>
+  <table id="directTeamTable" style="width:100%">
+    <thead>
+      <tr>
+        <th>Wallet</th>
+        <th>Staked (USDT)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="directTeamBody">
+      <tr><td colspan="3" class="center sm">No directs yet.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:16px 0 8px; color:#ffd86b;">Indirect Team</h3>
+  <table id="indirectTeamTable" style="width:100%">
+    <thead>
+      <tr>
+        <th>Wallet</th>
+        <th>Staked (USDT)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="indirectTeamBody">
+      <tr><td colspan="3" class="center sm">No indirects yet.</td></tr>
+    </tbody>
+  </table>
+</div>
+
 
         <div style="margin-top:12px">
           <table>
@@ -180,9 +211,22 @@
       </div>
 
       <div class="card">
-        <h2>Withdrawal History</h2>
-        <div id="withdrawTableWrapper" class="sm">No withdrawal history loaded.</div>
-      </div>
+       <div class="card">
+  <h2>Withdrawal History</h2>
+  <table id="withdrawHistoryTable" style="width:100%">
+    <thead>
+      <tr>
+        <th>Tx Hash</th>
+        <th>Amount (USDT)</th>
+        <th>Status</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="withdrawHistoryBody">
+      <tr><td colspan="4" class="center sm">No withdrawals yet.</td></tr>
+    </tbody>
+  </table>
+</div>
 
     </div>
 
@@ -1093,7 +1137,103 @@ async function refreshAll() {
     console.error("refreshAll error:", err);
   }
 }
+// ✅ Withdrawal History Loader
+async function loadWithdrawHistory() {
+  if (!stakingContract || !account) return;
+  try {
+    const count = await stakingContract.withdrawRequestsCount();
+    const tbody = document.getElementById("withdrawHistoryBody");
+    tbody.innerHTML = "";
 
+    for (let i = Number(count); i > 0 && i > Number(count) - 20; i--) {
+      const req = await stakingContract.getWithdrawRequest(i);
+      if (req.user.toLowerCase() !== account.toLowerCase()) continue;
+
+      const amt = fromUnits(req.amount);
+      const status =
+        req.status === 0
+          ? "Pending"
+          : req.status === 1
+          ? "Approved"
+          : "Rejected";
+      const time = new Date(Number(req.timestamp) * 1000).toLocaleString();
+
+      const row = `<tr>
+        <td><a href="https://testnet.bscscan.com/tx/${i}" target="_blank">#${i}</a></td>
+        <td>${toFixedNumber(amt, 6)}</td>
+        <td>${status}</td>
+        <td>${time}</td>
+      </tr>`;
+      tbody.innerHTML += row;
+    }
+
+    if (!tbody.innerHTML) {
+      tbody.innerHTML =
+        '<tr><td colspan="4" class="center sm">No withdrawals yet.</td></tr>';
+    }
+  } catch (e) {
+    console.warn("withdraw history error", e);
+  }
+}
+
+// ✅ Direct & Indirect Team Loader
+async function loadTeamInfo() {
+  if (!stakingContract || !account) return;
+
+  try {
+    const directs = await stakingContract.getDirectRefs(account);
+    const directBody = document.getElementById("directTeamBody");
+    directBody.innerHTML = "";
+
+    if (directs.length === 0) {
+      directBody.innerHTML =
+        '<tr><td colspan="3" class="center sm">No directs yet.</td></tr>';
+    } else {
+      for (let i = 0; i < directs.length; i++) {
+        const u = await stakingContract.getUserInfo(directs[i]);
+        const staked = fromUnits(u.staked);
+        const status = staked > 0 ? "Active" : "Inactive";
+        const row = `<tr>
+          <td>${directs[i]}</td>
+          <td>${toFixedNumber(staked, 2)}</td>
+          <td>${status}</td>
+        </tr>`;
+        directBody.innerHTML += row;
+      }
+    }
+
+    // ---- Indirects ----
+    let indirects = [];
+    for (let i = 0; i < directs.length; i++) {
+      const subs = await stakingContract.getDirectRefs(directs[i]);
+      indirects = indirects.concat(subs);
+    }
+
+    const indirectBody = document.getElementById("indirectTeamBody");
+    indirectBody.innerHTML = "";
+
+    if (indirects.length === 0) {
+      indirectBody.innerHTML =
+        '<tr><td colspan="3" class="center sm">No indirects yet.</td></tr>';
+    } else {
+      for (let i = 0; i < indirects.length; i++) {
+        const u = await stakingContract.getUserInfo(indirects[i]);
+        const staked = fromUnits(u.staked);
+        const status = staked > 0 ? "Active" : "Inactive";
+        const row = `<tr>
+          <td>${indirects[i]}</td>
+          <td>${toFixedNumber(staked, 2)}</td>
+          <td>${status}</td>
+        </tr>`;
+        indirectBody.innerHTML += row;
+      }
+    }
+  } catch (e) {
+    console.warn("team load error", e);
+  }
+}
+await loadWithdrawHistory();
+await loadTeamInfo();
 document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 
 // auto-refresh every 60s
