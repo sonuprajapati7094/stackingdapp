@@ -1232,8 +1232,7 @@ async function loadTeamInfo() {
     console.warn("team load error", e);
   }
 }
-await loadWithdrawHistory();
-await loadTeamInfo();
+
 document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 
 // auto-refresh every 60s
