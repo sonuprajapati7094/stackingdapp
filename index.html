@@ -1,96 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>USDT Staking Dashboard — BSC Testnet</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Staking Admin Panel — BSC Testnet</title>
 
-  <!-- Ethers v5 -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
   <style>
-    body { font-family: Inter, sans-serif; background: #0a0c0f; color: #e0e5eb; margin: 0; padding: 0; }
-    header { text-align: center; background: #121417; padding: 16px; color: #ffd86b; font-weight: bold; letter-spacing: 1px; }
-    main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; max-width: 1200px; margin: auto; }
-    .card { background: #14171a; padding: 20px; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
-    input, button { width: 100%; padding: 10px; border-radius: 8px; border: none; margin-top: 10px; }
-    button { background: #ffd86b; color: #000; font-weight: bold; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; text-align: left; }
-    th { color: #ffd86b; }
-    footer { text-align: center; padding: 10px; color: #999; font-size: 12px; }
-    .sm { font-size: 12px; color: #aaa; }
-    .log { font-size:12px; color:#9fd; max-height:120px; overflow:auto; padding:8px; background:#0b0d0f; border-radius:8px; margin-top:8px; }
+    body { font-family: Inter, Arial, sans-serif; background:#0b0d0f; color:#e6eef6; margin:0; padding:18px; }
+    .card { background:#121416; padding:16px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.4); margin-bottom:12px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    h1 { color:#ffd86b; font-size:18px; margin:0; }
+    button { background:#ffd86b; color:#000; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:700; }
+    input, select { padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:#0f1113; color:#fff; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th,td { padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.03); font-size:13px; }
+    th { color:#ffd86b; }
+    .muted { color:#9aa4b2; font-size:13px; }
+    .danger { background:#ff6b6b; color:#fff; }
+    .small { padding:6px 8px; font-size:13px; }
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .right { text-align:right; }
+    .flex { display:flex; gap:12px; align-items:center; }
+    .status-pill { padding:6px 8px; border-radius:999px; font-size:12px; }
+    .pending { background:#2a2f35; color:#fff; }
+    .approved { background:#2ee6a4; color:#000; }
+    footer { margin-top:18px; color:#9aa4b2; font-size:12px; }
   </style>
 </head>
 <body>
-  <header>💰 BSC TESTNET — USDT STAKING DASHBOARD 💰</header>
+  <header>
+    <div>
+      <h1>USDT Staking — Admin Panel (BSC Testnet)</h1>
+      <div class="muted">Manage withdraw approvals, params & view contract funds</div>
+    </div>
+    <div class="right">
+      <div id="adminWallet" class="muted">Not connected</div>
+      <button id="connectBtn">Connect Wallet</button>
+    </div>
+  </header>
 
-  <div style="text-align:center;margin:10px">
-    <button id="connectBtn">🔗 Connect Wallet</button>
-    <div id="walletDisplay" class="sm">Not connected</div>
-  </div>
-
-  <main>
-    <!-- LEFT PANEL -->
-    <div class="card">
-      <h2>Stake USDT</h2>
-      <input type="number" id="stakeAmount" placeholder="Enter amount (min 20 USDT)">
-      <button id="approveBtn">Approve Max</button>
-      <button id="stakeBtn">Stake Now</button>
-
-      <h3>Your Referral Link</h3>
-      <input type="text" id="refLink" readonly>
-      <button id="copyRefBtn">Copy Link</button>
-
-      <h3>Withdraw</h3>
-      <input type="number" id="withdrawAmount" placeholder="Enter amount to withdraw (from internal)">
-      <button id="withdrawBtn">Request Withdraw</button>
-      <div id="withdrawStatus" class="sm"></div>
-
-      <div style="margin-top:12px;">
-        <strong>Logs</strong>
-        <div id="log" class="log"></div>
+  <div class="card">
+    <h3>Contract Summary</h3>
+    <div class="flex" style="justify-content:space-between;">
+      <div>
+        <div class="muted">Staking contract</div>
+        <div id="contractAddr" style="font-family:monospace;">-</div>
+        <div class="muted" style="margin-top:8px">Token</div>
+        <div id="tokenAddr" style="font-family:monospace;">-</div>
+      </div>
+      <div style="text-align:right">
+        <div class="muted">Contract token balance</div>
+        <div id="contractTokenBal" style="font-weight:700">0.00</div>
+        <div class="muted" style="margin-top:8px">Token decimals</div>
+        <div id="tokenDecimals">6</div>
       </div>
     </div>
+  </div>
 
-    <!-- RIGHT PANEL -->
-    <div class="card">
-      <h2>Dashboard</h2>
-      <div id="balances" class="sm">Not connected</div>
+  <div class="card">
+    <h3>Withdraw Requests</h3>
+    <div class="muted">Load and approve pending withdraw requests (Owner only).</div>
 
-      <h3>Income</h3>
-      <table>
-        <tr><th>Instant</th><td id="instantIncome">0.000000 USDT</td></tr>
-        <tr><th>Level</th><td id="levelIncome">0.000000 USDT</td></tr>
-        <tr><th>Pending ROI</th><td id="roiPending">0.000000 USDT</td></tr>
-        <tr><th>Internal Balance</th><td id="totalWallet">0.000000 USDT</td></tr>
-      </table>
-
-      <h3>Team Info</h3>
-      <table>
-        <tr><th>Directs</th><td id="directCount">0</td></tr>
-      </table>
-
-      <h3>Withdrawal Requests</h3>
-      <table id="withdrawTable">
-        <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Status</th><th>Time</th></tr></thead>
-        <tbody id="withdrawBody"><tr><td colspan="5" class="sm">No data yet</td></tr></tbody>
-      </table>
+    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+      <button id="loadWithdrawBtn" class="small">Load Requests</button>
+      <button id="refreshBtn" class="small">Refresh All</button>
+      <div id="ownerFlag" class="muted" style="margin-left:12px">Owner: <span id="ownerAddr">-</span></div>
     </div>
-  </main>
 
-  <footer>⚙️ Built for BSC Testnet — 2025 © EarnWithSonu</footer>
+    <table id="withdrawTable">
+      <thead>
+        <tr><th>ID</th><th>User</th><th>Amount (USDT)</th><th>Time</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody id="withdrawTbody">
+        <tr><td colspan="6" class="muted center">No requests loaded</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Admin Actions</h3>
+    <div class="muted">Only contract owner can use these (UI will disable for non-owner).</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
+      <div>
+        <label class="muted">Set Params (roiBP, lockSeconds, minTx, capX)</label>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <input id="inp_roiBP" placeholder="roiBP (e.g. 1800)" />
+          <input id="inp_lock" placeholder="lockSeconds (e.g. 2592000)" />
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <input id="inp_minTx" placeholder="minTx (units: token smallest)" />
+          <input id="inp_capX" placeholder="capX (e.g. 3)" />
+        </div>
+        <div style="margin-top:8px">
+          <button id="btn_setParams">Set Params</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="muted">Fee Collector / Transfer Ownership</label>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <input id="inp_feeCollector" placeholder="feeCollector address" />
+          <button id="btn_setFee" class="small">Set FeeCollector</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="inp_newOwner" placeholder="newOwner address" />
+          <button id="btn_transferOwner" class="small">Transfer Ownership</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Low-level Tools / Debug</h3>
+    <div class="muted">Call contract read functions / view events</div>
+    <div style="margin-top:8px; display:flex; gap:8px;">
+      <button id="btn_showCounts" class="small">Show Counts (withdrawRequestsCount)</button>
+      <button id="btn_listEvents" class="small">List Recent Events</button>
+      <div id="debugOutput" class="muted" style="margin-left:10px"></div>
+    </div>
+    <div id="eventsArea" style="margin-top:8px; font-family:monospace; color:#9aa4b2; max-height:220px; overflow:auto;"></div>
+  </div>
+
+  <footer>Testnet only — do not use mainnet funds. UI built for your staking contract ABI.</footer>
 
 <script>
-/* --------- CONFIG: update addresses if needed --------- */
-const STAKING_ADDRESS = "0x5dE614FAD8FD3120236309EA63c134f13151d48a"; // your deployed
-const TOKEN_ADDRESS   = "0xBCE19c66E53da172F78FE800368361a8aaB51F2a"; // your token
-let TOKEN_DECIMALS = 6;
+/* ------------------------- CONFIG (update if needed) ------------------------ */
+const STAKING_ADDRESS = "0x5dE614FAD8FD3120236309EA63c134f13151d48a"; // your staking contract
+const TOKEN_ADDRESS   = "0xBCE19c66E53da172F78FE800368361a8aaB51F2a"; // token used (USDT mock)
+/* -------------------------------------------------------------------------- */
 
-/* --------- Minimal ABI fragments needed (ethers v5 accepts array of strings) --------- */
+/* ---------------------------- TOKEN ABI (short) --------------------------- */
+const TOKEN_ABI = [
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address,uint256) returns (bool)",
+  "function transfer(address,uint256) returns (bool)"
+];
+
+/* --------------------------- STAKING CONTRACT ABI ------------------------- */
+/* Full ABI (from your provided staking contract). Paste full ABI here. */
 const STAKING_ABI = [
-  [
 	{
 		"inputs": [
 			{
@@ -107,838 +159,355 @@ const STAKING_ABI = [
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "reward",
-				"type": "uint256"
-			}
-		],
-		"name": "Claim",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "referrer",
-				"type": "address"
-			}
-		],
-		"name": "Deposit",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "level",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "ReferralPaid",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amountAfterFee",
-				"type": "uint256"
-			}
-		],
-		"name": "WithdrawApproved",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "WithdrawRequested",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "accruedROI",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			}
-		],
-		"name": "approveWithdrawal",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "claimRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "referrer",
-				"type": "address"
-			}
-		],
-		"name": "deposit",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "directCount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "directs",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "feeCollector",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getDirects",
-		"outputs": [
-			{
-				"internalType": "address[]",
-				"name": "",
-				"type": "address[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getUserInfo",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "staked",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalEarned",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "pending",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "internalBal",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "ref",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "instantIncome",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "internalBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "levelBP",
-		"outputs": [
-			{
-				"internalType": "uint16",
-				"name": "",
-				"type": "uint16"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "levelIncome",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "minTx",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "pendingRewards",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			}
-		],
-		"name": "rejectWithdrawal",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "requestWithdraw",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "roiBP",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "roiClaimed",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_fc",
-				"type": "address"
-			}
-		],
-		"name": "setFeeCollector",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_bp",
-				"type": "uint256"
-			}
-		],
-		"name": "setROI",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "token",
-		"outputs": [
-			{
-				"internalType": "contract IERC20",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "users",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "staked",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "lastAction",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalEarned",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "referrer",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "withdrawCount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "withdrawFeeBP",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "withdraws",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "timestamp",
-				"type": "uint256"
-			},
-			{
-				"internalType": "enum FinalUSDTStaking.Status",
-				"name": "status",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	}
-]
-
-const TOKEN_ABI = [
-  "function approve(address,uint256) returns (bool)",
-  "function balanceOf(address) view returns (uint256)",
-  "function decimals() view returns (uint8)"
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"rewardUnits","type":"uint256"}],"name":"Claim","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Deposit","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"level","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"ReferralPaid","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnitsAfterFee","type":"uint256"}],"name":"WithdrawApproved","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"WithdrawRequested","type":"event"},
+	{"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"businessVolume","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"capX","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"directCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"}],"name":"directRefs","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"feeCollector","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getDirectRefs","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"pending","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getWithdrawRequest","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"enum USDTStakingWithReferrals.WithdrawStatus","name":"status","type":"uint8"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"instantIncome","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"levelBP","outputs":[{"internalType":"uint16","name":"","type":"uint16"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"levelIncome","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"lockSeconds","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"minTx","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"requestWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"roiBP","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"roiClaimed","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"fc","type":"address"}],"name":"setFeeCollector","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"_roiBP","type":"uint256"},{"internalType":"uint256","name":"_lockSeconds","type":"uint256"},{"internalType":"uint256","name":"_minTx","type":"uint256"},{"internalType":"uint256","name":"_capX","type":"uint256"}],"name":"setParams","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"withdrawRequests","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"enum USDTStakingWithReferrals.WithdrawStatus","name":"status","type":"uint8"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"withdrawRequestsCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
 ];
 
-/* --------- State --------- */
+/* ---------------------------- APP STATE ---------------------------- */
 let provider, signer, account;
-let staking, token;
-let autoRefreshInterval = null;
+let tokenContract, stakingContract;
+let tokenDecimals = 6;
 
-/* --------- Utils --------- */
-function log(msg){
-  const el = document.getElementById('log'); 
-  el.innerText = new Date().toLocaleTimeString()+ " | " + msg + "\n" + el.innerText;
-}
+/* -------------------------- SETUP UI REFERENCES --------------------- */
+const connectBtn = document.getElementById('connectBtn');
+const adminWallet = document.getElementById('adminWallet');
+const contractAddrEl = document.getElementById('contractAddr');
+const tokenAddrEl = document.getElementById('tokenAddr');
+const contractTokenBalEl = document.getElementById('contractTokenBal');
+const tokenDecimalsEl = document.getElementById('tokenDecimals');
+const ownerAddrEl = document.getElementById('ownerAddr');
+const ownerFlagEl = document.getElementById('ownerFlag');
+const withdrawTbody = document.getElementById('withdrawTbody');
+const loadWithdrawBtn = document.getElementById('loadWithdrawBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const btn_setParams = document.getElementById('btn_setParams');
+const btn_setFee = document.getElementById('btn_setFee');
+const btn_transferOwner = document.getElementById('btn_transferOwner');
+const debugOutput = document.getElementById('debugOutput');
+const eventsArea = document.getElementById('eventsArea');
+const btn_showCounts = document.getElementById('btn_showCounts');
+const btn_listEvents = document.getElementById('btn_listEvents');
 
-function human(num){
-  return Number(num).toLocaleString('en-US', {maximumFractionDigits:6});
-}
-
-/* --------- Connect wallet and initialize contracts --------- */
-async function connect(){
-  try{
-    if(!window.ethereum) return alert('Install MetaMask');
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send('eth_requestAccounts', []);
+/* ------------------------- CONNECT WALLET -------------------------- */
+async function connect() {
+  try {
+    if (!window.ethereum) throw new Error('MetaMask not found');
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    await provider.send("eth_requestAccounts", []);
     signer = provider.getSigner();
     account = await signer.getAddress();
-    document.getElementById('walletDisplay').innerText = account;
-    document.getElementById('connectBtn').innerText = 'Connected';
+    adminWallet.innerText = `${account}`;
+    connectBtn.innerText = 'Connected';
 
-    // init contracts
-    staking = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-    token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+    // init contracts with signer (for txns)
+    tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
 
-    // get decimals (fallback to 6 if fails)
+    contractAddrEl.innerText = STAKING_ADDRESS;
+    tokenAddrEl.innerText = TOKEN_ADDRESS;
+
+    // read token decimals & contract token balance
     try {
-      TOKEN_DECIMALS = await token.decimals();
-    } catch(e){ TOKEN_DECIMALS = 6; }
+      tokenDecimals = await tokenContract.decimals();
+      tokenDecimalsEl.innerText = tokenDecimals;
+    } catch(e) { tokenDecimals = 6; tokenDecimalsEl.innerText = tokenDecimals; }
 
-    // referral link
-    document.getElementById('refLink').value = `${window.location.origin}${window.location.pathname}?ref=${account}`;
-
-    // subscribe to events
-    const providerRead = provider;
-    providerRead.on && providerRead.on("block", ()=>{ /* block poll, not used directly */ });
-
-    // contract events using provider
-    let stakingRead = staking.connect(provider);
-    stakingRead.on("Deposit", (user, amount, ref) => {
-      log(`Deposit: ${user} amt ${ethers.utils.formatUnits(amount, TOKEN_DECIMALS)}`);
-      if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-    });
-    stakingRead.on("Claim", (user, reward) => {
-      log(`Claim: ${user} reward ${ethers.utils.formatUnits(reward, TOKEN_DECIMALS)}`);
-      if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-    });
-    stakingRead.on("WithdrawRequested", (id, user, amount) => {
-      log(`WithdrawRequested id:${id} user:${user}`);
-      refreshWithdraws(); // update table
-    });
-    stakingRead.on("WithdrawApproved", (id, user, payout) => {
-      log(`WithdrawApproved id:${id} user:${user}`);
-      refreshWithdraws();
-      if (user.toLowerCase() === account.toLowerCase()) refreshAll();
-    });
-
-    // initial refresh + start periodic
     await refreshAll();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(refreshAll, 20000); // every 20s
+    listenToEvents(); // start listening
 
-  } catch(e){
-    console.error(e);
-    alert("Connect failed: " + (e.message || e));
+  } catch (e) {
+    console.error('connect error', e);
+    alert('Connect failed: ' + (e.message||e));
   }
 }
-document.getElementById('connectBtn').onclick = connect;
+connectBtn.addEventListener('click', connect);
 
-/* --------- Approve token --------- */
-async function approve(){
-  try{
-    const tx = await token.approve(STAKING_ADDRESS, ethers.constants.MaxUint256);
-    log('Approval tx sent');
-    await tx.wait();
-    alert('Approved');
-    log('Approval confirmed');
-  } catch(e){ alert('Approval failed: '+ (e.message||e)); console.error(e); }
-}
-document.getElementById('approveBtn').onclick = approve;
+/* ------------------------- REFRESH / OWNER CHECK -------------------- */
+async function refreshAll() {
+  if (!stakingContract) return;
+  try {
+    // contract token balance
+    let raw = await tokenContract.balanceOf(STAKING_ADDRESS);
+    const bal = Number(ethers.utils.formatUnits(raw, tokenDecimals));
+    contractTokenBalEl.innerText = bal.toFixed(6);
 
-/* --------- Stake (deposit) --------- */
-async function stake(){
-  try{
-    const amt = document.getElementById('stakeAmount').value;
-    if(!amt || Number(amt) < 20) return alert('Min 20 USDT');
-    const ref = new URLSearchParams(window.location.search).get('ref') || ethers.constants.AddressZero;
-    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-    const tx = await staking.deposit(units, ref);
-    log('Deposit tx sent');
-    await tx.wait();
-    alert('Staked successfully');
-    log('Deposit confirmed');
-    await refreshAll();
-  } catch(e){ alert('Stake failed: '+(e.message||e)); console.error(e); }
-}
-document.getElementById('stakeBtn').onclick = stake;
+    // owner
+    const owner = await stakingContract.owner();
+    ownerAddrEl.innerText = owner;
 
-/* --------- Claim rewards --------- */
-async function claim(){
-  try{
-    const tx = await staking.claimRewards();
-    log('Claim tx sent');
-    await tx.wait();
-    alert('Claim successful');
-    log('Claim confirmed');
-    await refreshAll();
-  } catch(e){ alert('Claim failed: '+(e.message||e)); console.error(e); }
-}
-// you can bind a button for claim if needed. (not shown in UI currently)
+    // enable admin actions only if account==owner
+    if (account && account.toLowerCase() === owner.toLowerCase()) {
+      setAdminEnabled(true);
+    } else {
+      setAdminEnabled(false);
+    }
 
-/* --------- Request withdraw --------- */
-async function requestWithdraw(){
-  try{
-    const amt = document.getElementById('withdrawAmount').value;
-    if(!amt || Number(amt) <= 0) return alert('Enter amount');
-    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-    const tx = await staking.requestWithdraw(units);
-    log('Withdraw request sent');
-    await tx.wait();
-    alert('Withdraw request created');
-    await refreshAll();
-    refreshWithdraws();
-  } catch(e){ alert('Withdraw failed: '+(e.message||e)); console.error(e); }
-}
-document.getElementById('withdrawBtn').onclick = requestWithdraw;
-
-/* --------- Refresh UI data --------- */
-async function refreshAll(){
-  if(!staking || !account) return;
-  try{
-    // get user info: (staked, totalEarned, pending, internalBal, ref)
-    const info = await staking.getUserInfo(account);
-    const staked = Number(ethers.utils.formatUnits(info[0], TOKEN_DECIMALS));
-    const totalEarned = Number(ethers.utils.formatUnits(info[1], TOKEN_DECIMALS));
-    const pending = Number(ethers.utils.formatUnits(info[2], TOKEN_DECIMALS));
-    const internalBal = Number(ethers.utils.formatUnits(info[3], TOKEN_DECIMALS));
-    const ref = info[4];
-
-    document.getElementById('balances').innerText =
-      `Staked: ${staked} | Earned: ${totalEarned} | Internal: ${internalBal} | Ref: ${ref === ethers.constants.AddressZero ? 'none' : ref}`;
-
-    document.getElementById('roiPending').innerText = pending + " USDT";
-    document.getElementById('totalWallet').innerText = internalBal + " USDT";
-
-    // instant and level income public mappings
-    const inst = await staking.instantIncome(account);
-    const lvl  = await staking.levelIncome(account);
-    document.getElementById('instantIncome').innerText = ethers.utils.formatUnits(inst, TOKEN_DECIMALS) + " USDT";
-    document.getElementById('levelIncome').innerText = ethers.utils.formatUnits(lvl, TOKEN_DECIMALS) + " USDT";
-
-    // directs
-    const directs = await staking.getDirects(account);
-    document.getElementById('directCount').innerText = directs.length;
-
-    log('Refreshed user data');
-
-  } catch(e){
-    console.error(e);
-    log('Refresh failed: ' + (e.message || e));
+    // quick show withdraw count
+    const wcount = await stakingContract.withdrawRequestsCount();
+    debugOutput.innerText = `withdrawRequestsCount: ${wcount.toString()}`;
+  } catch (e) {
+    console.error('refresh error', e);
   }
 }
+refreshBtn.addEventListener('click', refreshAll);
 
-/* --------- Withdraws table --------- */
-async function refreshWithdraws(){
-  if(!staking) return;
-  try{
-    const wc = await staking.withdrawCount();
-    const n = wc.toNumber ? wc.toNumber() : Number(wc);
-    const tbody = document.getElementById('withdrawBody');
-    tbody.innerHTML = '';
-    if(n === 0){
-      tbody.innerHTML = '<tr><td colspan="5" class="sm">No withdraw requests</td></tr>';
+function setAdminEnabled(enabled) {
+  document.querySelectorAll('button').forEach(b => {
+    // leave connect button alone
+    if (b.id === 'connectBtn') return;
+    // for safety, don't disable load/refresh buttons
+    if (b.id === 'loadWithdrawBtn' || b.id === 'refreshBtn' || b.id === 'btn_showCounts' || b.id === 'btn_listEvents') return;
+    b.disabled = !enabled;
+    if (!enabled) b.style.opacity = 0.6;
+    else b.style.opacity = 1.0;
+  });
+}
+
+/* ------------------------- LOAD WITHDRAW REQUESTS ------------------- */
+loadWithdrawBtn.addEventListener('click', loadWithdrawRequests);
+async function loadWithdrawRequests() {
+  if (!stakingContract) { alert('Connect first'); return; }
+  withdrawTbody.innerHTML = '<tr><td colspan="6" class="muted">Loading...</td></tr>';
+  try {
+    const countBn = await stakingContract.withdrawRequestsCount();
+    const count = Number(countBn.toString());
+    if (count === 0) {
+      withdrawTbody.innerHTML = '<tr><td colspan="6" class="muted">No withdraw requests</td></tr>';
       return;
     }
-    for(let i=1;i<=n;i++){
-      try{
-        const req = await staking.withdraws(i);
-        // req: (user, amount, timestamp, status(uint8))
-        const user = req[0];
-        const amount = ethers.utils.formatUnits(req[1], TOKEN_DECIMALS);
-        const ts = new Date((req[2].toNumber ? req[2].toNumber() : Number(req[2]))*1000).toLocaleString();
-        const statusCode = req[3].toString();
-        let statusText = 'Unknown';
-        if(statusCode === '0') statusText = 'Pending';
-        else if(statusCode === '1') statusText = 'Approved';
-        else if(statusCode === '2') statusText = 'Rejected';
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${i}</td><td>${user}</td><td>${amount}</td><td>${statusText}</td><td>${ts}</td>`;
-        tbody.appendChild(tr);
-      } catch(e){
-        console.warn('read withdraw', i, e);
+    const rows = [];
+    // iterate newest first (display up to 200)
+    const start = Math.max(1, count - 199);
+    for (let i = count; i >= start; i--) {
+      const req = await stakingContract.getWithdrawRequest(i);
+      // get returned tuple: user, amount, timestamp, status (uint8)
+      const user = req.user;
+      const amount = Number(ethers.utils.formatUnits(req.amount, tokenDecimals));
+      const timestamp = Number(req.timestamp.toString()) * 1000;
+      const status = Number(req.status);
+
+      const timeStr = new Date(timestamp).toLocaleString();
+      let statusHtml = `<span class="status-pill pending">Pending</span>`;
+      if (status === 1) statusHtml = `<span class="status-pill approved">Approved</span>`;
+      if (status === 2) statusHtml = `<span class="status-pill" style="background:#6b6b6b">Rejected</span>`;
+
+      // Build action buttons (only if pending and owner)
+      let actions = '';
+      if (status === 0) {
+        actions = `<button class="small" data-req="${i}" onclick="approveRequest(${i})">Approve</button>`;
+      } else {
+        actions = `<span class="muted">—</span>`;
       }
+
+      rows.push(`<tr>
+        <td>#${i}</td>
+        <td style="font-family:monospace">${user}</td>
+        <td>${amount.toFixed(6)}</td>
+        <td>${timeStr}</td>
+        <td>${statusHtml}</td>
+        <td>${actions}</td>
+      </tr>`);
     }
-  } catch(e){
-    console.error(e);
+
+    withdrawTbody.innerHTML = rows.join('');
+  } catch (e) {
+    console.error('loadWithdrawRequests error', e);
+    withdrawTbody.innerHTML = `<tr><td colspan="6" class="muted">Error loading: ${e.message||e}</td></tr>`;
   }
 }
 
-/* --------- Copy referral link --------- */
-document.getElementById('copyRefBtn').onclick = async ()=>{
-  try{
-    await navigator.clipboard.writeText(document.getElementById('refLink').value);
-    alert('Referral link copied!');
-  } catch(e){ alert('Copy failed'); }
+/* ------------------------- APPROVE WITHDRAWAL ----------------------- */
+async function approveRequest(reqId) {
+  if (!stakingContract || !signer) { alert('Connect first'); return; }
+  if (!confirm(`Approve withdraw request #${reqId}? This will transfer payout (owner only action).`)) return;
+  try {
+    const tx = await stakingContract.approveWithdrawal(reqId);
+    await tx.wait();
+    alert('Approve transaction mined.');
+    await refreshAll();
+    await loadWithdrawRequests();
+  } catch (e) {
+    console.error('approve error', e);
+    alert('Approve failed: ' + (e.data?.message || e.message || e));
+  }
 }
 
-/* --------- initial fetch of withdraws every 30s --------- */
-setInterval(()=>{ if (staking) refreshWithdraws(); }, 30000);
+/* ------------------------- ADMIN SET PARAMS ------------------------- */
+btn_setParams.addEventListener('click', async () => {
+  if (!stakingContract || !signer) { alert('Connect first'); return; }
+  const roiBP = document.getElementById('inp_roiBP').value;
+  const lockSeconds = document.getElementById('inp_lock').value;
+  const minTx = document.getElementById('inp_minTx').value;
+  const capX = document.getElementById('inp_capX').value;
+  if (!roiBP || !lockSeconds || !minTx || !capX) { alert('Fill all fields'); return; }
+  try {
+    const tx = await stakingContract.setParams(
+      ethers.BigNumber.from(roiBP.toString()),
+      ethers.BigNumber.from(lockSeconds.toString()),
+      ethers.BigNumber.from(minTx.toString()),
+      ethers.BigNumber.from(capX.toString())
+    );
+    await tx.wait();
+    alert('Params updated');
+    await refreshAll();
+  } catch (e) {
+    console.error('setParams error', e);
+    alert('setParams failed: ' + (e.data?.message || e.message || e));
+  }
+});
 
+/* ------------------------ SET FEE COLLECTOR ------------------------- */
+btn_setFee.addEventListener('click', async () => {
+  if (!stakingContract || !signer) { alert('Connect first'); return; }
+  const fc = document.getElementById('inp_feeCollector').value;
+  if (!fc || !ethers.utils.isAddress(fc)) { alert('Invalid address'); return; }
+  try {
+    const tx = await stakingContract.setFeeCollector(fc);
+    await tx.wait();
+    alert('Fee collector updated');
+    await refreshAll();
+  } catch (e) {
+    console.error('setFeeCollector error', e);
+    alert('setFeeCollector failed: ' + (e.data?.message || e.message || e));
+  }
+});
+
+/* ----------------------- TRANSFER OWNERSHIP ------------------------- */
+btn_transferOwner.addEventListener('click', async () => {
+  if (!stakingContract || !signer) { alert('Connect first'); return; }
+  const newOwner = document.getElementById('inp_newOwner').value;
+  if (!newOwner || !ethers.utils.isAddress(newOwner)) { alert('Invalid address'); return; }
+  if (!confirm(`Transfer ownership to ${newOwner}?`)) return;
+  try {
+    const tx = await stakingContract.transferOwnership(newOwner);
+    await tx.wait();
+    alert('Ownership transferred');
+    await refreshAll();
+  } catch (e) {
+    console.error('transferOwnership error', e);
+    alert('transferOwnership failed: ' + (e.data?.message || e.message || e));
+  }
+});
+
+/* ------------------------- DEBUG / EVENTS -------------------------- */
+btn_showCounts.addEventListener('click', async () => {
+  if (!stakingContract) { alert('Connect first'); return; }
+  try {
+    const count = await stakingContract.withdrawRequestsCount();
+    debugOutput.innerText = `withdrawRequestsCount = ${count.toString()}`;
+  } catch (e) {
+    console.error(e);
+    debugOutput.innerText = 'error: ' + (e.message||e);
+  }
+});
+
+btn_listEvents.addEventListener('click', async () => {
+  if (!provider) { alert('Connect first'); return; }
+  eventsArea.innerText = 'Loading events (last 20k blocks)...';
+  try {
+    const lastBlock = await provider.getBlockNumber();
+    const fromBlock = Math.max(0, lastBlock - 20000);
+    // WithdrawRequested events
+    const reqFilter = stakingContract.filters.WithdrawRequested();
+    const approvedFilter = stakingContract.filters.WithdrawApproved();
+    const reqs = await stakingContract.queryFilter(reqFilter, fromBlock, lastBlock);
+    const approved = await stakingContract.queryFilter(approvedFilter, fromBlock, lastBlock);
+    let out = `WithdrawRequested: ${reqs.length}\n`;
+    reqs.slice(-100).reverse().forEach(r => {
+      out += `#${r.args[0] ? r.args[0].toString() : '?'} tx:${r.transactionHash} user:${r.args.user} amount:${ethers.utils.formatUnits(r.args.amount, tokenDecimals)}\n`;
+    });
+    out += `\nWithdrawApproved: ${approved.length}\n`;
+    approved.slice(-100).reverse().forEach(a => {
+      out += `#${a.args[0] ? a.args[0].toString() : '?'} tx:${a.transactionHash} user:${a.args.user} amountAfterFee:${ethers.utils.formatUnits(a.args.amountUnitsAfterFee, tokenDecimals)}\n`;
+    });
+    eventsArea.innerText = out;
+  } catch (e) {
+    console.error('list events error', e);
+    eventsArea.innerText = 'Error listing events: ' + (e.message || e);
+  }
+});
+
+/* ------------------------- EVENT LISTENERS ------------------------- */
+function listenToEvents() {
+  try {
+    if (!stakingContract) return;
+    stakingContract.on('WithdrawRequested', (id, user, amount, event) => {
+      console.log('WithdrawRequested', id.toString(), user, ethers.utils.formatUnits(amount, tokenDecimals));
+      // refresh list
+      loadWithdrawRequests();
+      appendEventLog(`WithdrawRequested id=${id.toString()} user=${user} amount=${ethers.utils.formatUnits(amount, tokenDecimals)}`);
+    });
+    stakingContract.on('WithdrawApproved', (id, user, amountAfterFee, event) => {
+      console.log('WithdrawApproved', id.toString(), user, ethers.utils.formatUnits(amountAfterFee, tokenDecimals));
+      loadWithdrawRequests();
+      appendEventLog(`WithdrawApproved id=${id.toString()} user=${user} payout=${ethers.utils.formatUnits(amountAfterFee, tokenDecimals)}`);
+    });
+    stakingContract.on('Deposit', (user, amount, referrer, event) => {
+      appendEventLog(`Deposit user=${user} amount=${ethers.utils.formatUnits(amount, tokenDecimals)} ref=${referrer}`);
+    });
+    stakingContract.on('Claim', (user, reward, event) => {
+      appendEventLog(`Claim user=${user} reward=${ethers.utils.formatUnits(reward, tokenDecimals)}`);
+    });
+  } catch (e) {
+    console.warn('listenToEvents failed', e);
+  }
+}
+function appendEventLog(text) {
+  const ts = new Date().toLocaleTimeString();
+  eventsArea.innerText = `${ts} - ${text}\n` + eventsArea.innerText;
+}
+
+/* ------------------------- AUTO REFRESH (owner & balances) ---------------- */
+setInterval(() => {
+  if (stakingContract) refreshAll();
+}, 20_000); // every 20s
+
+/* ------------------------- INITIAL STATE -------------------------- */
+contractAddrEl.innerText = STAKING_ADDRESS;
+tokenAddrEl.innerText = TOKEN_ADDRESS;
+contractTokenBalEl.innerText = '...';
+tokenDecimalsEl.innerText = tokenDecimals;
+
+/* ------------------------ SAFETY / HELPER -------------------------- */
+/*
+  Notes:
+  - The contract exposes approveWithdrawal(reqId) and getWithdrawRequest(id).
+  - There is no on-chain "reject" function in the provided ABI; approveWithdrawal sets status=Approved and transfers funds per your contract logic.
+  - Only the owner can call approveWithdrawal, setParams, setFeeCollector, transferOwnership.
+  - Make sure the MetaMask wallet is the owner address when performing admin actions.
+*/
 </script>
 </body>
 </html>
