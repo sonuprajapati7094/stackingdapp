@@ -1,95 +1,174 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Admin Panel | USDT Stacking Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Panel — USDT Staking</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body{font-family:Arial;background:#101010;color:#fff;padding:20px;}
-    .card{background:#1c1c1c;padding:18px;border-radius:10px;margin-bottom:20px;}
-    input,button{padding:8px;margin:6px;border-radius:8px;border:none;}
-    button{background:#ffb300;color:#000;font-weight:bold;cursor:pointer;}
+    body { background:#0b0d0f; color:#e6eef6; font-family:Inter, Arial, sans-serif; margin:0; }
+    header { background:#111; padding:16px; text-align:center; color:#ffd86b; font-weight:700; font-size:20px; }
+    .container { max-width:1000px; margin:20px auto; background:#15181b; padding:20px; border-radius:12px; }
+    button { background:#ffd86b; color:#000; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; font-weight:600; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th,td { border-bottom:1px solid rgba(255,255,255,0.1); padding:10px; text-align:left; }
+    th { color:#ffd86b; font-weight:700; }
+    input { padding:8px; border-radius:6px; border:1px solid #333; background:#0f1113; color:#fff; width:100%; }
+    .sm { font-size:12px; color:#999; }
+    .row { display:flex; gap:10px; margin-top:10px; }
+    .card { background:#111316; padding:12px; border-radius:8px; margin-top:20px; }
+    .green { color:#4caf50; }
+    .red { color:#f44336; }
   </style>
 </head>
 <body>
-<h2>Admin Panel (Owner: 0x8b2Ce640BD59C7333e72BaE9a3Fc8D33d5460c63)</h2>
+<header>Admin Panel — USDT Staking (BSC Testnet)</header>
 
-<div class="card">
-  <label>Staking Contract:</label>
-  <input id="stakingAddr" value="0xdA95503f22813eceAFE4338cE9241FEae5308637" style="width:80%" />
-  <button id="load">Load</button>
-</div>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div id="walletInfo">Not connected</div>
+    <button id="connectBtn">Connect Wallet</button>
+  </div>
 
-<div id="panel" style="display:none" class="card">
-  <h3>Parameters</h3>
-  <input id="minStake" placeholder="minStake" />
-  <input id="stakeMultiple" placeholder="stakeMultiple" /><br/>
-  <input id="minWithdraw" placeholder="minWithdraw" />
-  <input id="withdrawMultiple" placeholder="withdrawMultiple" /><br/>
-  <input id="dailyRatePPM" placeholder="dailyRatePPM" />
-  <input id="instantPercent" placeholder="instantPercent" />
-  <input id="withdrawFeePercent" placeholder="withdrawFeePercent" /><br/>
-  <button id="setParams">Update Params</button>
-</div>
+  <div class="card">
+    <h3>🔍 Check User Info</h3>
+    <div class="row">
+      <input id="userAddr" placeholder="Enter user wallet address" />
+      <button onclick="getUserInfo()">Fetch</button>
+    </div>
+    <div id="userResult" class="sm" style="margin-top:10px;">No data yet.</div>
+  </div>
 
-<div class="card">
-  <h3>Admin Withdraw</h3>
-  <input id="withdrawAmt" placeholder="Amount base units" />
-  <input id="withdrawTo" placeholder="To Address" style="width:60%" />
-  <button id="adminWithdraw">Withdraw</button>
+  <div class="card">
+    <h3>💸 Pending Withdrawals</h3>
+    <button onclick="loadWithdrawals()">Refresh</button>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>User</th><th>Amount</th><th>Status</th><th>Time</th><th>Action</th></tr>
+      </thead>
+      <tbody id="withdrawBody">
+        <tr><td colspan="6" class="sm">No pending withdrawals</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </div>
 
 <script>
+const STAKING_ADDRESS = "0x15531ac551C50E47A1bb499Bf5B56b51cB958949";  // replace if different
+const TOKEN_ADDRESS   = "0xBCE19c66E53da172F78FE800368361a8aaB51F2a";
+
+let provider, signer, contract, token;
+let TOKEN_DECIMALS = 6;
+
 const STAKING_ABI = [
- "function setParams(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)",
- "function adminWithdraw(uint256,address)",
- "function minStake() view returns (uint256)",
- "function stakeMultiple() view returns (uint256)",
- "function minWithdraw() view returns (uint256)",
- "function withdrawMultiple() view returns (uint256)",
- "function dailyRatePPM() view returns (uint256)",
- "function instantPercent() view returns (uint256)",
- "function withdrawFeePercent() view returns (uint256)"
+  {"inputs":[],"name":"withdrawRequestsCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getWithdrawRequest","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint8","name":"status","type":"uint8"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"rejectWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"pending","type":"uint256"},{"internalType":"uint256","name":"incomeBal","type":"uint256"}],"stateMutability":"view","type":"function"}
 ];
-let provider, signer, stakingContract;
-async function load(){
-  provider = new ethers.BrowserProvider(window.ethereum);
-  await provider.send('eth_requestAccounts', []);
-  signer = await provider.getSigner();
-  const addr = document.getElementById('stakingAddr').value.trim();
-  stakingContract = new ethers.Contract(addr, STAKING_ABI, signer);
-  document.getElementById('panel').style.display = 'block';
-  document.getElementById('minStake').value = (await stakingContract.minStake()).toString();
-  document.getElementById('stakeMultiple').value = (await stakingContract.stakeMultiple()).toString();
-  document.getElementById('minWithdraw').value = (await stakingContract.minWithdraw()).toString();
-  document.getElementById('withdrawMultiple').value = (await stakingContract.withdrawMultiple()).toString();
-  document.getElementById('dailyRatePPM').value = (await stakingContract.dailyRatePPM()).toString();
-  document.getElementById('instantPercent').value = (await stakingContract.instantPercent()).toString();
-  document.getElementById('withdrawFeePercent').value = (await stakingContract.withdrawFeePercent()).toString();
+
+const TOKEN_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function decimals() view returns (uint8)"
+];
+
+async function connect() {
+  if (!window.ethereum) { alert("Install MetaMask"); return; }
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = provider.getSigner();
+  const addr = await signer.getAddress();
+  document.getElementById("walletInfo").innerText = "Connected: " + addr;
+  contract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+  token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+  try { TOKEN_DECIMALS = await token.decimals(); } catch(e){}
+  loadWithdrawals();
 }
-async function setParams(){
-  const tx = await stakingContract.setParams(
-    document.getElementById('minStake').value,
-    document.getElementById('stakeMultiple').value,
-    document.getElementById('minWithdraw').value,
-    document.getElementById('withdrawMultiple').value,
-    3,
-    document.getElementById('dailyRatePPM').value,
-    document.getElementById('instantPercent').value,
-    document.getElementById('withdrawFeePercent').value
-  );
-  await tx.wait(); alert('Params updated ✅');
+document.getElementById("connectBtn").addEventListener("click", connect);
+
+function fromUnits(v){ return Number(ethers.utils.formatUnits(v, TOKEN_DECIMALS)); }
+
+async function loadWithdrawals() {
+  if (!contract) { alert("Connect wallet first"); return; }
+  const tbody = document.getElementById("withdrawBody");
+  tbody.innerHTML = "<tr><td colspan='6' class='sm'>Loading...</td></tr>";
+  try {
+    const count = await contract.withdrawRequestsCount();
+    let html = "";
+    for (let i = Number(count); i >= 1 && i > count - 50; i--) {
+      const req = await contract.getWithdrawRequest(i);
+      const statusText = req.status==0 ? "Pending" : req.status==1 ? "Approved" : "Rejected";
+      const color = req.status==0 ? "#ffd86b" : req.status==1 ? "#4caf50" : "#f44336";
+      const time = new Date(Number(req.timestamp)*1000).toLocaleString();
+      const amt = fromUnits(req.amount);
+      let actionBtns = "";
+      if (req.status==0) {
+        actionBtns = `<button onclick="approve(${i})">✅</button>
+                      <button onclick="reject(${i})">❌</button>`;
+      }
+      html += `<tr>
+        <td>#${i}</td>
+        <td>${req.user}</td>
+        <td>${amt.toFixed(2)} USDT</td>
+        <td style="color:${color}">${statusText}</td>
+        <td>${time}</td>
+        <td>${actionBtns}</td>
+      </tr>`;
+    }
+    tbody.innerHTML = html || "<tr><td colspan='6' class='sm'>No withdrawals found.</td></tr>";
+  } catch(e){ 
+    console.error(e);
+    tbody.innerHTML = "<tr><td colspan='6' class='sm red'>Error loading withdrawals.</td></tr>";
+  }
 }
-async function adminWithdraw(){
-  const tx = await stakingContract.adminWithdraw(
-    document.getElementById('withdrawAmt').value,
-    document.getElementById('withdrawTo').value
-  );
-  await tx.wait(); alert('Withdraw complete ✅');
+
+async function approve(id) {
+  if (!contract) return;
+  if (!confirm("Approve withdrawal #" + id + "?")) return;
+  try {
+    const tx = await contract.approveWithdrawal(id);
+    await tx.wait();
+    alert("Withdrawal approved");
+    loadWithdrawals();
+  } catch(e){ alert("Error: " + e.message); }
 }
-document.getElementById('load').onclick = load;
-document.getElementById('setParams').onclick = setParams;
-document.getElementById('adminWithdraw').onclick = adminWithdraw;
+
+async function reject(id) {
+  if (!contract) return;
+  if (!confirm("Reject withdrawal #" + id + "?")) return;
+  try {
+    const tx = await contract.rejectWithdrawal(id);
+    await tx.wait();
+    alert("Withdrawal rejected");
+    loadWithdrawals();
+  } catch(e){ alert("Error: " + e.message); }
+}
+
+async function getUserInfo() {
+  const addr = document.getElementById("userAddr").value.trim();
+  if (!ethers.utils.isAddress(addr)) { alert("Invalid address"); return; }
+  const div = document.getElementById("userResult");
+  try {
+    const info = await contract.getUserInfo(addr);
+    const staked = fromUnits(info.staked);
+    const income = fromUnits(info.incomeBal);
+    const pending = fromUnits(info.pending);
+    const earned = fromUnits(info.totalEarned);
+    div.innerHTML = `
+      <b>Wallet:</b> ${addr}<br/>
+      <b>Staked:</b> ${staked.toFixed(2)} USDT<br/>
+      <b>Pending ROI:</b> ${pending.toFixed(2)} USDT<br/>
+      <b>Income Balance:</b> ${income.toFixed(2)} USDT<br/>
+      <b>Total Earned:</b> ${earned.toFixed(2)} USDT<br/>
+      <b>Referrer:</b> ${info.referrer}
+    `;
+  } catch(e){
+    div.innerHTML = "<span class='red'>Error fetching info</span>";
+    console.error(e);
+  }
+}
 </script>
 </body>
 </html>
