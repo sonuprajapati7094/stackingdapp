@@ -278,8 +278,12 @@ async function refreshAll() {
       }
       document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-      await loadTeamInfo();
-      await loadWithdrawHistory();
+      // ensure DOM ready before rendering data
+setTimeout(async () => {
+  await loadTeamInfo();
+  await loadWithdrawHistory();
+}, 500);
+
     } catch (e) {
       console.warn("team/withdraw load error", e);
     }
@@ -331,8 +335,8 @@ async function stake() {
       try { ref = await stakingContract.owner(); } catch(e){ ref = ethers.constants.AddressZero; }
     }
 
-    const tx = await stakingContract.deposit(units, ref);
-    await tx.wait();
+  const tx = await stakingContract.stake(units, ref);
+      await tx.wait();
     alert("Deposit successful");
     await refreshAll();
   } catch (e) {
