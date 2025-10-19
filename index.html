@@ -335,7 +335,7 @@ async function stake() {
       try { ref = await stakingContract.owner(); } catch(e){ ref = ethers.constants.AddressZero; }
     }
 
-  const tx = await stakingContract.stake(units, ref);
+const tx = await stakingContract.depositUSDT(units, ref);
       await tx.wait();
     alert("Deposit successful");
     await refreshAll();
