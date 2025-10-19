@@ -280,8 +280,8 @@ async function refreshAll() {
 
       // ensure DOM ready before rendering data
 setTimeout(async () => {
-  await loadTeamInfo();
-  await loadWithdrawHistory();
+  try { await loadTeamInfo(); } catch(e){ console.warn("loadTeamInfo failed", e); }
+  try { await loadWithdrawHistory(); } catch(e){ console.warn("loadWithdrawHistory failed", e); }
 }, 500);
 
     } catch (e) {
