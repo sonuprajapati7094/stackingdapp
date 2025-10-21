@@ -274,8 +274,8 @@ async function refreshAll() {
     document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
     document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
 
-    // days to 3x using daily rate 0.6%
-    const dailyRate = 0.006;
+    // days to 3x using daily rate 1.0%
+    const dailyRate = 0.01;
     let daysTo3x = 0;
     if (staked > 0) {
       const dailyReward = staked * dailyRate;
