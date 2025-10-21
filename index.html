@@ -454,78 +454,84 @@ async function loadWithdrawHistory() {
 async function loadTeamInfo() {
   if (!stakingContract || !account) return;
   try {
-    const directs = await stakingContract.getDirectRefs(account);
+    // Direct Team
+    let directs = [];
+    try {
+      directs = await stakingContract.getDirectRefs(account);
+      console.log("Direct refs:", directs);
+    } catch (err) {
+      console.error("getDirectRefs error:", err);
+    }
+
     const directBody = document.getElementById("directTeamBody");
     directBody.innerHTML = "";
+
     if (!directs || directs.length === 0) {
       directBody.innerHTML = '<tr><td colspan="3" class="center sm">No directs yet.</td></tr>';
     } else {
-      for (let i=0;i<directs.length;i++){
+      for (let i = 0; i < directs.length; i++) {
         const addr = directs[i];
-        const info = await stakingContract.getUserInfo(addr);
-        const st = fromUnits(info.staked || 0);
-        const status = st > 0 ? "Active" : "Inactive";
-        directBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st,6)}</td><td>${status}</td></tr>`;
+        if (!ethers.utils.isAddress(addr)) continue;
+        try {
+          const info = await stakingContract.getUserInfo(addr);
+          const st = fromUnits(info.staked || 0);
+          const status = st > 0 ? "Active" : "Inactive";
+          directBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st, 2)} USDT</td><td>${status}</td></tr>`;
+        } catch (err) {
+          console.warn("getUserInfo failed for", addr, err);
+        }
       }
     }
 
-    // Indirects = gather getDirectRefs of each direct
+    // Indirect Team
     let indirects = [];
-    for (let i=0;i<directs.length;i++){
-      const subs = await stakingContract.getDirectRefs(directs[i]);
-      indirects = indirects.concat(subs);
+    for (let i = 0; i < directs.length; i++) {
+      try {
+        const subs = await stakingContract.getDirectRefs(directs[i]);
+        if (subs && subs.length > 0) indirects = indirects.concat(subs);
+      } catch (err) {
+        console.warn("sub load error", err);
+      }
     }
+
     const indirectBody = document.getElementById("indirectTeamBody");
     indirectBody.innerHTML = "";
+
     if (!indirects || indirects.length === 0) {
       indirectBody.innerHTML = '<tr><td colspan="3" class="center sm">No indirects yet.</td></tr>';
     } else {
-      for (let i=0;i<indirects.length;i++){
+      for (let i = 0; i < indirects.length; i++) {
         const addr = indirects[i];
-        const info = await stakingContract.getUserInfo(addr);
-        const st = fromUnits(info.staked || 0);
-        const status = st > 0 ? "Active" : "Inactive";
-        indirectBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st,6)}</td><td>${status}</td></tr>`;
+        if (!ethers.utils.isAddress(addr)) continue;
+        try {
+          const info = await stakingContract.getUserInfo(addr);
+          const st = fromUnits(info.staked || 0);
+          const status = st > 0 ? "Active" : "Inactive";
+          indirectBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st, 2)} USDT</td><td>${status}</td></tr>`;
+        } catch (err) {
+          console.warn("getUserInfo failed for", addr, err);
+        }
       }
     }
+
+    // Update counts
+    document.getElementById("directCount").innerText = directs.length.toString();
+    document.getElementById("indirectCount").innerText = indirects.length.toString();
+
+    let active = 0, inactive = 0;
+    for (let i = 0; i < directs.length; i++) {
+      const addr = directs[i];
+      const info = await stakingContract.getUserInfo(addr);
+      const st = fromUnits(info.staked || 0);
+      if (st > 0) active++; else inactive++;
+    }
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
   } catch (e) {
-    console.warn("loadTeamInfo", e);
+    console.error("loadTeamInfo error", e);
   }
 }
 
-/* show team quick below referral */
-document.getElementById("showTeamBtn").addEventListener("click", displayTeam);
-async function displayTeam(){
-  if (!stakingContract || !account) { alert("Connect wallet first"); return; }
-  try {
-    const refs = await stakingContract.getDirectRefs(account);
-    let container = document.getElementById("teamListContainer");
-    if (!container) {
-      container = document.createElement("div");
-      container.id = "teamListContainer";
-      container.style.marginTop = "10px";
-      container.style.maxHeight = "260px";
-      container.style.overflowY = "auto";
-      container.style.background = "var(--panel)";
-      container.style.padding = "10px";
-      container.style.borderRadius = "8px";
-      document.querySelector(".left").appendChild(container);
-    }
-    if (!refs || refs.length === 0) { container.innerHTML = "<div class='sm muted'>No direct refs found.</div>"; return; }
-    let html = "<table style='width:100%;font-size:13px;'><tr><th>Address</th><th>Staked</th></tr>";
-    for (let i=0;i<refs.length;i++){
-      const r = refs[i];
-      const info = await stakingContract.getUserInfo(r);
-      const st = fromUnits(info.staked || 0);
-      html += `<tr><td class='sm'>${r}</td><td>${toFixedNumber(st,6)} USDT</td></tr>`;
-    }
-    html += "</table>";
-    container.innerHTML = html;
-  } catch (e) {
-    console.error("displayTeam error", e);
-    alert("Could not load team: " + (e.message || e));
-  }
-}
 
 /* Copy referral */
 document.getElementById("copyRefBtn").addEventListener("click", async () => {
