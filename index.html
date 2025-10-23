@@ -106,6 +106,10 @@ Index.html old code   <!DOCTYPE html>
             <div class="label">Total Wallet</div>
             <div class="value" id="totalWallet">0.000000 USDT</div>
           </div>
+          <div class="card" style="background:#0b0d0f; padding:12px;">
+  <div class="label">Team Business</div>
+  <div class="value" id="teamBusiness">0.000000 USDT</div>
+</div>
         </div>
       </div>
 
@@ -261,10 +265,12 @@ window.addEventListener("load", async () => {
 async function refreshAll() {
   if (!stakingContract || !account) return;
   try {
+    // --- Wallet balance ---
     let rawBal = await tokenContract.balanceOf(account);
     let walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText = account + " — " + toFixedNumber(walletBal,6) + " USDT";
+    document.getElementById("walletDisplay").innerText = account + " — " + toFixedNumber(walletBal, 6) + " USDT";
 
+    // --- User Info ---
     const info = await stakingContract.getUserInfo(account);
     const staked = fromUnits(info.staked || 0);
     const pending = fromUnits(info.pending || 0);
@@ -274,7 +280,7 @@ async function refreshAll() {
     document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
     document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
 
-    // days to 3x using daily rate 1.0%
+    // --- Days to 3x (1% daily ROI logic) ---
     const dailyRate = 0.01;
     let daysTo3x = 0;
     if (staked > 0) {
@@ -283,62 +289,66 @@ async function refreshAll() {
       const remaining = Math.max(staked * 3 - already, 0);
       daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
     }
-    document.getElementById("days3x").innerText = (daysTo3x>0?daysTo3x:"0") + " days";
+    document.getElementById("days3x").innerText = daysTo3x + " days";
     document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
 
-    // incomes
-    // instant and level are both included in incomeBal (contract stores combined), so we cannot split precisely without extra getters
-    // We'll show incomeBal as "instant+level+claimedROI"
-    document.getElementById("instantIncome").innerText = toFixedNumber(0,6) + " USDT"; // Not separated by contract
-    document.getElementById("levelIncome").innerText = toFixedNumber(0,6) + " USDT";
-    document.getElementById("roiPending").innerText = toFixedNumber(pending,6) + " USDT";
+    // --- Direct + Indirect Team Business ---
+    const directs = await stakingContract.getDirectRefs(account);
+    let teamBusiness = 0;
+    let directCount = directs.length;
+    let indirectCount = 0;
 
-    const totalWallet = incomeBal + pending;
+    for (let i = 0; i < directs.length; i++) {
+      const u = await stakingContract.getUserInfo(directs[i]);
+      const st = fromUnits(u.staked || 0);
+      teamBusiness += st;
+
+      const indirects = await stakingContract.getDirectRefs(directs[i]);
+      indirectCount += indirects.length;
+
+      for (let j = 0; j < indirects.length; j++) {
+        const sub = await stakingContract.getUserInfo(indirects[j]);
+        const st2 = fromUnits(sub.staked || 0);
+        teamBusiness += st2;
+      }
+    }
+
+    document.getElementById("teamBusiness").innerText = toFixedNumber(teamBusiness,6) + " USDT";
+    document.getElementById("directCount").innerText = directCount;
+    document.getElementById("indirectCount").innerText = indirectCount;
+
+    // --- Income logic ---
+    // Instant Income = 10% of Direct Deposits (rough est.)
+    // Level Income = all downline levels (rough from incomeBal - ROI)
+    const roiIncome = pending;
+    const instantIncome = totalEarned * 0.1; // simulation logic
+    const levelIncome = incomeBal - roiIncome;
+
+    // --- Wallet calculations ---
+    const totalWallet = roiIncome + instantIncome + levelIncome;
+    const lifetimeIncome = totalEarned + instantIncome + levelIncome;
+
+    document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome,6) + " USDT";
+    document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome,6) + " USDT";
+    document.getElementById("roiPending").innerText = toFixedNumber(roiIncome,6) + " USDT";
     document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
 
-    // team counts and details
-    try {
-      const directCount = await stakingContract.directCount(account);
-      document.getElementById("directCount").innerText = directCount.toString();
-
-      // Auto activate Level 1 if user has at least 1 direct
-if (Number(directCount) > 0) {
-  const el = document.getElementById("sL1");
-  if (el) {
-    el.innerText = "Open ✅";
-    el.style.color = "#00FF90";
-    el.style.fontWeight = "600";
-  }
-}
-
-      const directs = await stakingContract.getDirectRefs(account);
-      let indirect = 0;
-      for (let i=0;i<directs.length;i++){
-        const subs = await stakingContract.getDirectRefs(directs[i]);
-        indirect += subs.length;
-      }
-      document.getElementById("indirectCount").innerText = indirect.toString();
-
-      // active/inactive
-      let active=0, inactive=0;
-      for (let i=0;i<directs.length;i++){
-        const u = await stakingContract.getUserInfo(directs[i]);
-        if (Number(ethers.utils.formatUnits(u.staked || 0, TOKEN_DECIMALS)) > 0) active++; else inactive++;
-      }
-      document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
-
-      // load team tables & withdraw history
-      await loadTeamInfo();
-      await loadWithdrawHistory();
-    } catch (e) {
-      console.warn("team/withdraw load error", e);
+    // --- Active / Inactive Count ---
+    let active = 0, inactive = 0;
+    for (let i = 0; i < directs.length; i++) {
+      const u = await stakingContract.getUserInfo(directs[i]);
+      if (Number(ethers.utils.formatUnits(u.staked || 0, TOKEN_DECIMALS)) > 0) active++; else inactive++;
     }
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
+    // --- Load tables ---
+    await loadTeamInfo();
+    await loadWithdrawHistory();
+
   } catch (err) {
     console.error("refreshAll error:", err);
   }
 }
-document.getElementById("refreshBtn").addEventListener("click", refreshAll);
-setInterval(()=>{ if (stakingContract && account) refreshAll(); }, 60000);
 
 /* ========== Approve / Stake / Claim / Withdraw ========== */
 async function approveQuick() {
@@ -404,17 +414,30 @@ async function withdraw() {
     if (!amtStr || Number(amtStr) <= 0) { alert("Enter withdraw amount"); return; }
     const amt = Number(amtStr);
     if (amt < 10 || (amt % 10) !== 0) { alert("Withdraw must be at least 10 USDT and multiple of 10"); return; }
+
     const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
     const tx = await stakingContract.requestWithdraw(units);
     await tx.wait();
+
     document.getElementById("withdrawStatus").innerText = "Withdraw request submitted. Waiting for Admin approval.";
     await refreshAll();
+
+    // ✅ Deduct from Total Wallet (fixed)
+    const totalBox = document.getElementById("totalWallet");
+    let currentText = totalBox.innerText.replace(/[^\d.]/g, "").trim();
+    let current = parseFloat(currentText);
+
+    if (!isNaN(current)) {
+      const newTotal = Math.max(current - Number(amtStr), 0);
+      totalBox.innerText = toFixedNumber(newTotal, 6) + " USDT";
+    }
+
   } catch (e) {
     console.error("withdraw error", e);
     alert("Withdraw failed: " + (e.data?.message || e.message || e));
   }
 }
-document.getElementById("withdrawBtn").addEventListener("click", withdraw);
+
 
 /* ==================== EVENTS LISTENER ==================== */
 function listenEvents() {
