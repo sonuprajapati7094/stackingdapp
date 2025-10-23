@@ -317,21 +317,32 @@ async function refreshAll() {
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
 
-    // --- Income logic ---
-    // Instant Income = 10% of Direct Deposits (rough est.)
-    // Level Income = all downline levels (rough from incomeBal - ROI)
-    const roiIncome = pending;
-    const instantIncome = totalEarned * 0.1; // simulation logic
-    const levelIncome = incomeBal - roiIncome;
+  // --- Income logic (fixed from contract data) ---
+const roiIncome = fromUnits(info.pending || 0); // ROI not yet claimed
+const totalRoiEarned = fromUnits(info.totalEarned || 0); // Lifetime ROI (claimed + pending)
+const internalBalance = fromUnits(info.incomeBal || 0); // Level + Instant + Claimed ROI combined
 
-    // --- Wallet calculations ---
-    const totalWallet = roiIncome + instantIncome + levelIncome;
-    const lifetimeIncome = totalEarned + instantIncome + levelIncome;
+// Now split logic
+// ROI earned (claimed + pending)
+let roiClaimed = Math.max(totalRoiEarned - roiIncome, 0);
 
-    document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome,6) + " USDT";
-    document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome,6) + " USDT";
-    document.getElementById("roiPending").innerText = toFixedNumber(roiIncome,6) + " USDT";
-    document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
+// Instant + Level Income (internal balance - claimed ROI)
+let instantAndLevel = Math.max(internalBalance - roiClaimed, 0);
+
+// For simplicity (no separation in contract):
+// Split 60% Level Income, 40% Instant Income (or your custom ratio)
+let instantIncome = instantAndLevel * 0.4;
+let levelIncome = instantAndLevel * 0.6;
+
+// Total Wallet = ROI Pending + Instant + Level
+const totalWallet = roiIncome + instantIncome + levelIncome;
+
+// Show on dashboard
+document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome,6) + " USDT";
+document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome,6) + " USDT";
+document.getElementById("roiPending").innerText = toFixedNumber(roiIncome,6) + " USDT";
+document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
+
 
     // --- Active / Inactive Count ---
     let active = 0, inactive = 0;
