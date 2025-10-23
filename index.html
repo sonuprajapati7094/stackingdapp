@@ -301,6 +301,16 @@ async function refreshAll() {
       const directCount = await stakingContract.directCount(account);
       document.getElementById("directCount").innerText = directCount.toString();
 
+      // Auto activate Level 1 if user has at least 1 direct
+if (Number(directCount) > 0) {
+  const el = document.getElementById("sL1");
+  if (el) {
+    el.innerText = "Open ✅";
+    el.style.color = "#00FF90";
+    el.style.fontWeight = "600";
+  }
+}
+
       const directs = await stakingContract.getDirectRefs(account);
       let indirect = 0;
       for (let i=0;i<directs.length;i++){
