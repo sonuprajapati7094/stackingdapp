@@ -459,33 +459,12 @@ function listenEvents() {
       refreshAll();
     });
 
-    /* ===== Level Income Credited ===== */
-    stakingContract.on("LevelCredited", (levelUser, from, level, amount, event) => {
-      console.log("🎯 LevelCredited Triggered:", levelUser, "from", from, "level", level.toString(), "amount", amount.toString());
-
-      if (levelUser.toLowerCase() === account.toLowerCase()) {
-        const lvl = parseInt(level.toString());
-        const el = document.getElementById(`sL${lvl}`);
-
-        if (el) {
-          el.innerText = "Open ✅";
-          el.style.color = "#00FF90"; // green success
-          el.style.fontWeight = "600";
-        }
-
-        const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
-        alert(`🎉 Level ${lvl} Income Received: ${amt} USDT`);
-      }
-
-      refreshAll();
-    });
-
-    /* ===== Referral Instant Income (10%) ===== */
+    /* ===== Referral Instant Income (Direct 10%) ===== */
     stakingContract.on("ReferralCredited", (referrer, from, amount, event) => {
       console.log("🤝 ReferralCredited:", referrer, "from", from, "amount", amount.toString());
 
       if (referrer.toLowerCase() === account.toLowerCase()) {
-        // Level 1 auto unlock
+        // Unlock Level 1
         const el = document.getElementById("sL1");
         if (el) {
           el.innerText = "Open ✅";
@@ -500,12 +479,32 @@ function listenEvents() {
       refreshAll();
     });
 
+    /* ===== Level Income Credited (Auto Unlock L2–L10) ===== */
+    stakingContract.on("LevelCredited", (levelUser, from, level, amount, event) => {
+      console.log("🎯 LevelCredited Triggered:", levelUser, "from", from, "level", level.toString(), "amount", amount.toString());
+
+      if (levelUser.toLowerCase() === account.toLowerCase()) {
+        const lvl = parseInt(level.toString());
+        if (lvl >= 1 && lvl <= 10) {
+          const el = document.getElementById(`sL${lvl}`);
+          if (el) {
+            el.innerText = "Open ✅";
+            el.style.color = "#00FF90";
+            el.style.fontWeight = "600";
+          }
+
+          const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
+          alert(`🎉 Level ${lvl} Income Received: ${amt} USDT`);
+        }
+      }
+
+      refreshAll();
+    });
+
   } catch (e) {
     console.warn("⚠️ listenEvents error", e);
   }
 }
-
-
 
 /* Load withdraw request history for current user */
 async function loadWithdrawHistory() {
