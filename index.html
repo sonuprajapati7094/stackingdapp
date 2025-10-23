@@ -428,6 +428,26 @@ function listenEvents() {
     });
   } catch(e){ console.warn("listenEvents", e); }
 }
+stakingContract.on("ReferralCredited", (referrer, from, amount, event) => {
+  console.log("ReferralCredited event detected:", referrer, from, amount.toString());
+
+  // Check if current wallet is referrer
+  if (referrer.toLowerCase() === account.toLowerCase()) {
+    // Mark Level 1 as "Open ✅"
+    const el = document.getElementById("sL1");
+    if (el) {
+      el.innerText = "Open ✅";
+      el.style.color = "#00FF90"; // green color for success
+    }
+
+    // Optional popup notification
+    const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
+    alert(`🎉 Level 1 Activated! You earned ${amt} USDT instant income.`);
+    
+    refreshAll();
+  }
+});
+
 
 /* Load withdraw request history for current user */
 async function loadWithdrawHistory() {
