@@ -406,47 +406,95 @@ async function withdraw() {
 }
 document.getElementById("withdrawBtn").addEventListener("click", withdraw);
 
-/* ==================== EVENTS & HISTORY ==================== */
+/* ==================== EVENTS LISTENER ==================== */
 function listenEvents() {
   try {
     if (!stakingContract) return;
+
+    /* ===== Deposit Event ===== */
     stakingContract.on("Deposit", (user, amount, referrer, event) => {
-      console.log("Deposit", user, amount.toString(), referrer);
+      console.log("📥 Deposit:", user, amount.toString(), "Referrer:", referrer);
+      if (user.toLowerCase() === account.toLowerCase()) {
+        alert("✅ Deposit Successful!");
+      }
       refreshAll();
     });
+
+    /* ===== Claim Event ===== */
     stakingContract.on("Claim", (user, reward, event) => {
-      console.log("Claim", user, reward.toString());
+      console.log("💰 Claim:", user, reward.toString());
+      if (user.toLowerCase() === account.toLowerCase()) {
+        const amt = ethers.utils.formatUnits(reward, TOKEN_DECIMALS);
+        alert(`🎉 ROI Claimed: ${amt} USDT credited to your internal wallet.`);
+      }
       refreshAll();
     });
+
+    /* ===== Withdraw Requested ===== */
     stakingContract.on("WithdrawRequested", (id, user, amount, event) => {
-      console.log("WithdrawRequested", id.toString(), user, amount.toString());
+      console.log("📤 Withdraw Requested:", id.toString(), user, amount.toString());
+      if (user.toLowerCase() === account.toLowerCase()) {
+        alert("🕒 Withdraw Request Submitted! Waiting for Admin approval.");
+      }
       refreshAll();
     });
+
+    /* ===== Withdraw Approved ===== */
     stakingContract.on("WithdrawApproved", (id, user, amountAfterFee, event) => {
-      console.log("WithdrawApproved", id.toString(), user, amountAfterFee.toString());
+      console.log("✅ Withdraw Approved:", id.toString(), user, amountAfterFee.toString());
+      if (user.toLowerCase() === account.toLowerCase()) {
+        const amt = ethers.utils.formatUnits(amountAfterFee, TOKEN_DECIMALS);
+        alert(`💸 Withdraw Approved! You received ${amt} USDT (after 5% fee).`);
+      }
       refreshAll();
     });
-  } catch(e){ console.warn("listenEvents", e); }
-}
-stakingContract.on("ReferralCredited", (referrer, from, amount, event) => {
-  console.log("ReferralCredited event detected:", referrer, from, amount.toString());
 
-  // Check if current wallet is referrer
-  if (referrer.toLowerCase() === account.toLowerCase()) {
-    // Mark Level 1 as "Open ✅"
-    const el = document.getElementById("sL1");
-    if (el) {
-      el.innerText = "Open ✅";
-      el.style.color = "#00FF90"; // green color for success
-    }
+    /* ===== Level Income Credited ===== */
+    stakingContract.on("LevelCredited", (levelUser, from, level, amount, event) => {
+      console.log("🎯 LevelCredited Triggered:", levelUser, "from", from, "level", level.toString(), "amount", amount.toString());
 
-    // Optional popup notification
-    const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
-    alert(`🎉 Level 1 Activated! You earned ${amt} USDT instant income.`);
-    
-    refreshAll();
+      if (levelUser.toLowerCase() === account.toLowerCase()) {
+        const lvl = parseInt(level.toString());
+        const el = document.getElementById(`sL${lvl}`);
+
+        if (el) {
+          el.innerText = "Open ✅";
+          el.style.color = "#00FF90"; // green success
+          el.style.fontWeight = "600";
+        }
+
+        const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
+        alert(`🎉 Level ${lvl} Income Received: ${amt} USDT`);
+      }
+
+      refreshAll();
+    });
+
+    /* ===== Referral Instant Income (10%) ===== */
+    stakingContract.on("ReferralCredited", (referrer, from, amount, event) => {
+      console.log("🤝 ReferralCredited:", referrer, "from", from, "amount", amount.toString());
+
+      if (referrer.toLowerCase() === account.toLowerCase()) {
+        // Level 1 auto unlock
+        const el = document.getElementById("sL1");
+        if (el) {
+          el.innerText = "Open ✅";
+          el.style.color = "#00FF90";
+          el.style.fontWeight = "600";
+        }
+
+        const amt = ethers.utils.formatUnits(amount, TOKEN_DECIMALS);
+        alert(`🔥 Level 1 Activated! You earned ${amt} USDT Instant Income.`);
+      }
+
+      refreshAll();
+    });
+
+  } catch (e) {
+    console.warn("⚠️ listenEvents error", e);
   }
-});
+}
+
 
 
 /* Load withdraw request history for current user */
