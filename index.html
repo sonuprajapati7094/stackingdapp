@@ -468,6 +468,53 @@ async function claim() {
   }
 }
 
+/* Withdraw request — this deducts from internal income balance immediately and creates request */
+async function withdraw() {
+  try {
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
+    }
+
+    const amtStr = document.getElementById("withdrawAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter withdraw amount");
+      return;
+    }
+
+    const amt = Number(amtStr);
+    if (amt < 10 || amt % 10 !== 0) {
+      alert("Withdraw must be at least 10 USDT and multiple of 10");
+      return;
+    }
+
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+    const tx = await stakingContract.requestWithdraw(units);
+    await tx.wait();
+
+    // ✅ Confirmation
+    document.getElementById("withdrawStatus").innerText =
+      `Withdraw request of ${amt} USDT submitted successfully. Waiting for admin approval.`;
+
+    // ✅ Deduct from Total Wallet instantly (frontend update)
+    const totalWalletEl = document.getElementById("totalWallet");
+    const walletText = totalWalletEl.innerText.replace("USDT", "").trim();
+    let walletValue = parseFloat(walletText);
+    if (!isNaN(walletValue)) {
+      walletValue = Math.max(walletValue - amt, 0);
+      totalWalletEl.innerText = toFixedNumber(walletValue, 6) + " USDT";
+    }
+
+    // ✅ Re-sync blockchain data after 2 seconds
+    setTimeout(async () => {
+      await refreshAll();
+    }, 2000);
+
+  } catch (e) {
+    console.error("Withdraw error:", e);
+    alert("Withdraw failed: " + (e.data?.message || e.message || e));
+  }
+}
 
 /* ==================== EVENTS LISTENER ==================== */
 function listenEvents() {
