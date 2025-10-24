@@ -472,33 +472,6 @@ for (let i = 1; i <= 10; i++) {
     console.error("refreshAll error:", err);
   }
 }
-// 🧾 Deduct all previous withdrawals (pending or approved)
-let totalWithdrawed = 0;
-try {
-  const countBn = await stakingContract.withdrawRequestsCount();
-  const count = Number(countBn || 0);
-
-  for (let i = 1; i <= count; i++) {
-    const req = await stakingContract.getWithdrawRequest(i);
-    if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
-      // Count only approved (1) or pending (0) requests
-      if (req.status === 0 || req.status === 1) {
-        totalWithdrawed += fromUnits(req.amount || 0);
-      }
-    }
-  }
-} catch (e) {
-  console.warn("Withdraw check failed:", e);
-}
-
-// 🧮 Final available wallet after all withdrawals
-let availableWallet = incomeBal + pending - totalWithdrawed;
-if (availableWallet < 0) availableWallet = 0;
-
-// 🪙 Update UI
-document.getElementById("totalWallet").innerText =
-  toFixedNumber(availableWallet, 6) + " USDT";
-
 /* ========== Approve / Stake / Claim / Withdraw ========== */
 async function approveQuick() {
   try {
