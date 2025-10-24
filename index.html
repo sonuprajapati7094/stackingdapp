@@ -553,21 +553,28 @@ async function withdraw() {
     const tx = await stakingContract.requestWithdraw(units);
     await tx.wait();
 
-    // ✅ Update UI instantly after withdraw
-    const totalBox = document.getElementById("totalWallet");
-    const currentText = totalBox.innerText.replace("USDT", "").trim();
-    const currentVal = parseFloat(currentText) || 0;
-    const newVal = currentVal - amt;
-    totalBox.innerText = toFixedNumber(newVal, 6) + " USDT";
+    // ✅ Manual front-end update
+    const totalWalletBox = document.getElementById("totalWallet");
+    let totalText = totalWalletBox.innerText.replace("USDT", "").trim();
+    let totalVal = parseFloat(totalText);
 
+    if (!isNaN(totalVal)) {
+      totalVal = Math.max(totalVal - amt, 0); // Prevent negative value
+      totalWalletBox.innerText = toFixedNumber(totalVal, 6) + " USDT";
+      console.log("Updated Total Wallet after withdraw:", totalVal);
+    } else {
+      console.warn("Could not parse total wallet value");
+    }
+
+    // ✅ Update withdraw status instantly
     document.getElementById("withdrawStatus").innerText =
-      "Withdraw request submitted successfully! Awaiting admin approval.";
+      `Withdraw request of ${amt} USDT submitted. Waiting for admin approval.`;
 
-    // Optional small success toast
-    console.log(`Withdraw request ${amt} USDT processed successfully.`);
-
-    // Refresh only history and not incomes (for performance)
-    await loadWithdrawHistory();
+    // ✅ Refresh history and total data again to match backend
+    setTimeout(async () => {
+      await loadWithdrawHistory();
+      await refreshAll(); // force re-fetch after 2s to confirm
+    }, 2000);
 
   } catch (e) {
     console.error("withdraw error", e);
