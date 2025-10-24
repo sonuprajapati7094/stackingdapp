@@ -379,23 +379,80 @@ async function refreshAll() {
     console.error("refreshAll error:", err);
   }
 }
-/* ==================== CONNECT ==================== */
+/* ==================== FIXED CONNECT WALLET ==================== */
 async function connect() {
   try {
-    if (!window.ethereum) { alert("MetaMask not found"); return; }
+    if (!window.ethereum) {
+      alert("⚠️ MetaMask not found. Please install MetaMask and refresh.");
+      return;
+    }
+
+    // Create provider & request accounts
     provider = new ethers.providers.Web3Provider(window.ethereum, "any");
     await provider.send("eth_requestAccounts", []);
     signer = provider.getSigner();
     account = await signer.getAddress();
-    document.getElementById("walletDisplay").innerText = account;
 
+    // Display connected wallet
+    document.getElementById("walletDisplay").innerText = `${account}`;
+    document.getElementById("connectBtn").innerText = "Connected ✅";
+
+    // Initialize contract instances
     stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
     tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
 
-    try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch(e){ console.warn("decimals read failed, using default", TOKEN_DECIMALS); }
+    // Try reading decimals (fallback = 6)
+    try {
+      const dec = await tokenContract.decimals();
+      TOKEN_DECIMALS = dec;
+    } catch (err) {
+      TOKEN_DECIMALS = 6;
+      console.warn("⚠️ Token decimals read failed, using default 6");
+    }
 
-    document.getElementById("referralInput").value = window.location.origin + window.location.pathname + "?ref=" + account;
+    // Generate referral link
+    const refLink = `${window.location.origin}${window.location.pathname}?ref=${account}`;
+    document.getElementById("referralInput").value = refLink;
     localStorage.setItem("staking_connected", account);
+
+    // Load dashboard data
+    await refreshAll();
+
+    // Setup event listeners (Deposit, Withdraw, etc.)
+    listenEvents();
+
+    console.log("✅ Wallet connected:", account);
+  } catch (err) {
+    console.error("❌ connect() error:", err);
+    alert("Connect failed: " + (err?.message || err));
+  }
+}
+
+// === Connect button event ===
+document.getElementById("connectBtn").addEventListener("click", connect);
+
+// === Auto reconnect if user connected before ===
+window.addEventListener("load", async () => {
+  const prev = localStorage.getItem("staking_connected");
+  if (prev && window.ethereum) {
+    try {
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      const accounts = await provider.listAccounts();
+      if (accounts && accounts.length > 0) {
+        signer = provider.getSigner();
+        account = accounts[0];
+        stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+        tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+        document.getElementById("walletDisplay").innerText = `${account}`;
+        document.getElementById("connectBtn").innerText = "Connected ✅";
+        await refreshAll();
+        listenEvents();
+      }
+    } catch (e) {
+      console.warn("Auto-reconnect failed:", e);
+    }
+  }
+});
 
 async function stake() {
   try {
