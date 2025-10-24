@@ -295,36 +295,50 @@ async function refreshAll() {
     }
     document.getElementById("days3x").innerText = daysTo3x + " days";
 
-    // ======= Team Calculation =======
-    let teamBusiness = 0;
-    let directCount = 0;
-    let indirectCount = 0;
-    let active = 0;
-    let inactive = 0;
+   // ======= TEAM & LEVEL FIXED LOGIC =======
+let teamBusiness = 0;
+let directCount = 0;
+let indirectCount = 0;
 
-    const directs = await stakingContract.getDirectRefs(account);
-    directCount = directs.length;
+// 1️⃣ Get only direct team (first level referrals)
+const directs = await stakingContract.getDirectRefs(account);
+directCount = directs.length;
 
-    for (let i = 0; i < directs.length; i++) {
-      const u = await stakingContract.getUserInfo(directs[i]);
-      const st = fromUnits(u.staked || 0);
-      teamBusiness += st;
-      if (st > 0) active++;
-      else inactive++;
+// 2️⃣ Calculate business volume from directs only
+for (let i = 0; i < directs.length; i++) {
+  const u = await stakingContract.getUserInfo(directs[i]);
+  const st = fromUnits(u.staked || 0);
+  teamBusiness += st;
+}
 
-      const indirects = await stakingContract.getDirectRefs(directs[i]);
-      indirectCount += indirects.length;
-      for (let j = 0; j < indirects.length; j++) {
-        const sub = await stakingContract.getUserInfo(indirects[j]);
-        const st2 = fromUnits(sub.staked || 0);
-        teamBusiness += st2;
-      }
-    }
+// 3️⃣ Now calculate indirects (2nd level only)
+for (let i = 0; i < directs.length; i++) {
+  const subRefs = await stakingContract.getDirectRefs(directs[i]);
+  indirectCount += subRefs.length;
+  for (let j = 0; j < subRefs.length; j++) {
+    const s = await stakingContract.getUserInfo(subRefs[j]);
+    const st2 = fromUnits(s.staked || 0);
+    teamBusiness += st2;
+  }
+}
 
-    document.getElementById("teamBusiness").innerText = toFixedNumber(teamBusiness, 6) + " USDT";
-    document.getElementById("directCount").innerText = directCount;
-    document.getElementById("indirectCount").innerText = indirectCount;
-    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+// 4️⃣ Update display
+document.getElementById("teamBusiness").innerText = toFixedNumber(teamBusiness, 6) + " USDT";
+document.getElementById("directCount").innerText = directCount;
+document.getElementById("indirectCount").innerText = indirectCount;
+document.getElementById("activeCounts").innerText = `${directCount} / ${indirectCount}`;
+
+// 5️⃣ LEVEL UNLOCK FIX (based only on direct count)
+for (let i = 1; i <= 10; i++) {
+  const el = document.getElementById(`sL${i}`);
+  if (!el) continue;
+  if (directCount >= i) {
+    el.innerHTML = "Open ✅";
+  } else {
+    el.innerHTML = "Pending";
+  }
+}
+
 
     // ======= Income Calculation (Real Business Logic) =======
 let roiIncome = 0, instantIncome = 0, levelIncome = 0, totalWallet = 0;
