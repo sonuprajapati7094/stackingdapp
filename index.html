@@ -343,17 +343,18 @@ async function refreshAll() {
     document.getElementById("roiPending").innerText = toFixedNumber(roiIncome, 6) + " USDT";
     document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
 
-    // ======= Level Unlock Logic =======
-    // Unlock based on directs count
-    for (let i = 1; i <= 10; i++) {
-      const el = document.getElementById(`sL${i}`);
-      if (!el) continue;
+   // ======= Level Unlock Logic =======
+for (let i = 1; i <= 10; i++) {
+  const el = document.getElementById(`sL${i}`);
+  if (!el) continue;
 
-      if (i === 1 && directCount >= 1) el.innerText = "Open ✅";
-      else if (i === 2 && directCount >= 2) el.innerText = "Open ✅";
-      else if (i > 2 && active >= i - 2) el.innerText = "Open ✅";
-      else el.innerText = "Pending";
-    }
+  // Unlock logic based purely on direct count
+  if (directCount >= i) {
+    el.innerText = "Open ✅";
+  } else {
+    el.innerText = "Pending";
+  }
+}
 
     // ======= Team Tables =======
     const directBody = document.getElementById("directTeamBody");
