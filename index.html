@@ -292,56 +292,95 @@ async function refreshAll() {
     document.getElementById("days3x").innerText = daysTo3x + " days";
     document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
 
-    // --- Direct + Indirect Team Business ---
-    const directs = await stakingContract.getDirectRefs(account);
-    let teamBusiness = 0;
-    let directCount = directs.length;
-    let indirectCount = 0;
 
-    for (let i = 0; i < directs.length; i++) {
-      const u = await stakingContract.getUserInfo(directs[i]);
-      const st = fromUnits(u.staked || 0);
-      teamBusiness += st;
+// --- Calculate team business & team counts ---
+let teamBusiness = 0;
+let directCount = directs.length;
+let indirectCount = 0;
 
-      const indirects = await stakingContract.getDirectRefs(directs[i]);
-      indirectCount += indirects.length;
+for (let i = 0; i < directs.length; i++) {
+  const u = await stakingContract.getUserInfo(directs[i]);
+  const st = fromUnits(u.staked || 0);
+  teamBusiness += st;
 
-      for (let j = 0; j < indirects.length; j++) {
-        const sub = await stakingContract.getUserInfo(indirects[j]);
-        const st2 = fromUnits(sub.staked || 0);
-        teamBusiness += st2;
-      }
-    }
+  const indirects = await stakingContract.getDirectRefs(directs[i]);
+  indirectCount += indirects.length;
 
-    document.getElementById("teamBusiness").innerText = toFixedNumber(teamBusiness,6) + " USDT";
-    document.getElementById("directCount").innerText = directCount;
-    document.getElementById("indirectCount").innerText = indirectCount;
+  for (let j = 0; j < indirects.length; j++) {
+    const sub = await stakingContract.getUserInfo(indirects[j]);
+    const st2 = fromUnits(sub.staked || 0);
+    teamBusiness += st2;
+  }
+}
 
-  // --- Income logic (fixed from contract data) ---
-const roiIncome = fromUnits(info.pending || 0); // ROI not yet claimed
-const totalRoiEarned = fromUnits(info.totalEarned || 0); // Lifetime ROI (claimed + pending)
-const internalBalance = fromUnits(info.incomeBal || 0); // Level + Instant + Claimed ROI combined
+document.getElementById("teamBusiness").innerText = toFixedNumber(teamBusiness, 6) + " USDT";
+document.getElementById("directCount").innerText = directCount;
+document.getElementById("indirectCount").innerText = indirectCount;
 
-// Now split logic
-// ROI earned (claimed + pending)
-let roiClaimed = Math.max(totalRoiEarned - roiIncome, 0);
+// --- Income logic (Hybrid Stable Version) ---
+let roiIncome = 0, instantIncome = 0, levelIncome = 0, totalWallet = 0;
 
-// Instant + Level Income (internal balance - claimed ROI)
-let instantAndLevel = Math.max(internalBalance - roiClaimed, 0);
+try {
+  const info = await stakingContract.getUserInfo(account);
+  const staked = fromUnits(info.staked || 0);
+  const pending = fromUnits(info.pending || 0);
+  const incomeBal = fromUnits(info.incomeBal || 0);
+  const totalEarned = fromUnits(info.totalEarned || 0);
 
-// For simplicity (no separation in contract):
-// Split 60% Level Income, 40% Instant Income (or your custom ratio)
-let instantIncome = instantAndLevel * 0.4;
-let levelIncome = instantAndLevel * 0.6;
+  roiIncome = pending; // current ROI pending
+  const roiClaimed = Math.max(totalEarned - pending, 0);
+  const combined = Math.max(incomeBal - roiClaimed, 0);
 
-// Total Wallet = ROI Pending + Instant + Level
-const totalWallet = roiIncome + instantIncome + levelIncome;
+  // fallback if combined is zero
+  if (combined === 0 && incomeBal > 0) {
+    instantIncome = incomeBal * 0.4;
+    levelIncome = incomeBal * 0.6;
+  } else {
+    instantIncome = combined * 0.4;
+    levelIncome = combined * 0.6;
+  }
 
-// Show on dashboard
-document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome,6) + " USDT";
-document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome,6) + " USDT";
-document.getElementById("roiPending").innerText = toFixedNumber(roiIncome,6) + " USDT";
-document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
+  totalWallet = roiIncome + instantIncome + levelIncome;
+
+  document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome, 6) + " USDT";
+  document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome, 6) + " USDT";
+  document.getElementById("roiPending").innerText = toFixedNumber(roiIncome, 6) + " USDT";
+  document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
+} catch (e) {
+  console.warn("income calc fallback:", e);
+  document.getElementById("instantIncome").innerText = "0.000000 USDT";
+  document.getElementById("levelIncome").innerText = "0.000000 USDT";
+}
+
+
+// --- Level Unlock Logic (stable version) ---
+try {
+  const directs = await stakingContract.getDirectRefs(account);
+  const directCount = directs.length;
+
+  // Level 1 unlock
+  if (directCount >= 1) document.getElementById("sL1").innerText = "Open ✅";
+  else document.getElementById("sL1").innerText = "Pending";
+
+  // Level 2 unlock
+  if (directCount >= 2) document.getElementById("sL2").innerText = "Open ✅";
+  else document.getElementById("sL2").innerText = "Pending";
+
+  // Level 3–10 unlock (based on active directs)
+  let active = 0;
+  for (let i = 0; i < directs.length; i++) {
+    const u = await stakingContract.getUserInfo(directs[i]);
+    const st = fromUnits(u.staked || 0);
+    if (st > 0) active++;
+  }
+
+  for (let i = 3; i <= 10; i++) {
+    document.getElementById(`sL${i}`).innerText = active >= i - 2 ? "Open ✅" : "Pending";
+  }
+
+} catch (e) {
+  console.warn("level unlock error", e);
+}
 
 
     // --- Active / Inactive Count ---
