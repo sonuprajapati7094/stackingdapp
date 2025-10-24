@@ -472,6 +472,32 @@ for (let i = 1; i <= 10; i++) {
     console.error("refreshAll error:", err);
   }
 }
+// 🧾 Deduct all previous withdrawals (pending or approved)
+let totalWithdrawed = 0;
+try {
+  const countBn = await stakingContract.withdrawRequestsCount();
+  const count = Number(countBn || 0);
+
+  for (let i = 1; i <= count; i++) {
+    const req = await stakingContract.getWithdrawRequest(i);
+    if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
+      // Count only approved (1) or pending (0) requests
+      if (req.status === 0 || req.status === 1) {
+        totalWithdrawed += fromUnits(req.amount || 0);
+      }
+    }
+  }
+} catch (e) {
+  console.warn("Withdraw check failed:", e);
+}
+
+// 🧮 Final available wallet after all withdrawals
+let availableWallet = incomeBal + pending - totalWithdrawed;
+if (availableWallet < 0) availableWallet = 0;
+
+// 🪙 Update UI
+document.getElementById("totalWallet").innerText =
+  toFixedNumber(availableWallet, 6) + " USDT";
 
 /* ========== Approve / Stake / Claim / Withdraw ========== */
 async function approveQuick() {
@@ -553,31 +579,26 @@ async function withdraw() {
     const tx = await stakingContract.requestWithdraw(units);
     await tx.wait();
 
-    // ✅ Manual front-end update
-    const totalWalletBox = document.getElementById("totalWallet");
-    let totalText = totalWalletBox.innerText.replace("USDT", "").trim();
-    let totalVal = parseFloat(totalText);
+    // ✅ Confirmation
+    document.getElementById("withdrawStatus").innerText =
+      `Withdraw request of ${amt} USDT submitted successfully. Waiting for admin approval.`;
 
-    if (!isNaN(totalVal)) {
-      totalVal = Math.max(totalVal - amt, 0); // Prevent negative value
-      totalWalletBox.innerText = toFixedNumber(totalVal, 6) + " USDT";
-      console.log("Updated Total Wallet after withdraw:", totalVal);
-    } else {
-      console.warn("Could not parse total wallet value");
+    // ✅ Deduct from Total Wallet instantly (frontend update)
+    const totalWalletEl = document.getElementById("totalWallet");
+    const walletText = totalWalletEl.innerText.replace("USDT", "").trim();
+    let walletValue = parseFloat(walletText);
+    if (!isNaN(walletValue)) {
+      walletValue = Math.max(walletValue - amt, 0);
+      totalWalletEl.innerText = toFixedNumber(walletValue, 6) + " USDT";
     }
 
-    // ✅ Update withdraw status instantly
-    document.getElementById("withdrawStatus").innerText =
-      `Withdraw request of ${amt} USDT submitted. Waiting for admin approval.`;
-
-    // ✅ Refresh history and total data again to match backend
+    // ✅ Re-sync blockchain data after 2 seconds
     setTimeout(async () => {
-      await loadWithdrawHistory();
-      await refreshAll(); // force re-fetch after 2s to confirm
+      await refreshAll();
     }, 2000);
 
   } catch (e) {
-    console.error("withdraw error", e);
+    console.error("Withdraw error:", e);
     alert("Withdraw failed: " + (e.data?.message || e.message || e));
   }
 }
