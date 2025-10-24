@@ -326,22 +326,51 @@ async function refreshAll() {
     document.getElementById("indirectCount").innerText = indirectCount;
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // ======= Income Calculation =======
-    let roiIncome = pending;
-    const roiClaimed = Math.max(totalEarned - pending, 0);
-    const combined = Math.max(incomeBal - roiClaimed, 0);
+    // ======= Income Calculation (Real Business Logic) =======
+let roiIncome = 0, instantIncome = 0, levelIncome = 0, totalWallet = 0;
 
-    // Split Instant/Level income 40/60
-    let instantIncome = combined * 0.4;
-    let levelIncome = combined * 0.6;
+try {
+  const info = await stakingContract.getUserInfo(account);
+  const staked = fromUnits(info.staked || 0);
+  const pending = fromUnits(info.pending || 0);
+  const totalEarned = fromUnits(info.totalEarned || 0);
+  const incomeBal = fromUnits(info.incomeBal || 0);
 
-    // Total wallet = ROI + Instant + Level
-    const totalWallet = roiIncome + instantIncome + levelIncome;
+  // ROI Income = pending (not yet claimed) + totalEarned (already claimed)
+  roiIncome = pending + totalEarned;
 
-    document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome, 6) + " USDT";
-    document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome, 6) + " USDT";
-    document.getElementById("roiPending").innerText = toFixedNumber(roiIncome, 6) + " USDT";
-    document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
+  // Instant Income = lifetime 10% referral reward (from Deposit event)
+  // Contract stores combined balance, so here we simulate separation:
+  // Approximation: 10% of direct deposits count toward instant income
+  const directs = await stakingContract.getDirectRefs(account);
+  let totalDirectStake = 0;
+  for (let i = 0; i < directs.length; i++) {
+    const u = await stakingContract.getUserInfo(directs[i]);
+    const st = fromUnits(u.staked || 0);
+    totalDirectStake += st;
+  }
+  instantIncome = totalDirectStake * 0.10; // 10% one-time reward
+
+  // Level Income = difference between internal income balance and instant
+  // (Represents ongoing ROI-based income from downline)
+  levelIncome = Math.max(incomeBal - instantIncome, 0);
+
+  // Total Wallet = withdrawable portion (internal + pending)
+  totalWallet = incomeBal + pending;
+
+  // Display
+  document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome, 6) + " USDT";
+  document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome, 6) + " USDT";
+  document.getElementById("roiPending").innerText = toFixedNumber(roiIncome, 6) + " USDT";
+  document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
+
+} catch (e) {
+  console.warn("income calc error:", e);
+  document.getElementById("instantIncome").innerText = "0.000000 USDT";
+  document.getElementById("levelIncome").innerText = "0.000000 USDT";
+  document.getElementById("roiPending").innerText = "0.000000 USDT";
+  document.getElementById("totalWallet").innerText = "0.000000 USDT";
+}
 
    // ======= Level Unlock Logic =======
 for (let i = 1; i <= 10; i++) {
