@@ -532,33 +532,48 @@ async function claim() {
 /* Withdraw request — this deducts from internal income balance immediately and creates request */
 async function withdraw() {
   try {
-    if (!stakingContract || !signer) { alert("Connect first"); return; }
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
+    }
+
     const amtStr = document.getElementById("withdrawAmount").value;
-    if (!amtStr || Number(amtStr) <= 0) { alert("Enter withdraw amount"); return; }
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter withdraw amount");
+      return;
+    }
+
     const amt = Number(amtStr);
-    if (amt < 10 || (amt % 10) !== 0) { alert("Withdraw must be at least 10 USDT and multiple of 10"); return; }
+    if (amt < 10 || amt % 10 !== 0) {
+      alert("Withdraw must be at least 10 USDT and multiple of 10");
+      return;
+    }
+
     const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
     const tx = await stakingContract.requestWithdraw(units);
     await tx.wait();
-  document.getElementById("withdrawStatus").innerText = "Withdraw request submitted. Waiting for Admin approval.";
-await refreshAll();
 
-// Reduce total wallet value after withdraw
-const amttr = document.getElementById("withdrawAmount").value;
-if (amtStr) {
-  const totalBox = document.getElementById("totalWallet");
-  let current = parseFloat(totalBox.innerText);
-  if (!isNaN(current)) {
-    totalBox.innerText = toFixedNumber(current - Number(amtStr), 6) + " USDT";
-  }
-}
+    // ✅ Update UI instantly after withdraw
+    const totalBox = document.getElementById("totalWallet");
+    const currentText = totalBox.innerText.replace("USDT", "").trim();
+    const currentVal = parseFloat(currentText) || 0;
+    const newVal = currentVal - amt;
+    totalBox.innerText = toFixedNumber(newVal, 6) + " USDT";
+
+    document.getElementById("withdrawStatus").innerText =
+      "Withdraw request submitted successfully! Awaiting admin approval.";
+
+    // Optional small success toast
+    console.log(`Withdraw request ${amt} USDT processed successfully.`);
+
+    // Refresh only history and not incomes (for performance)
+    await loadWithdrawHistory();
 
   } catch (e) {
     console.error("withdraw error", e);
     alert("Withdraw failed: " + (e.data?.message || e.message || e));
   }
 }
-document.getElementById("withdrawBtn").addEventListener("click", withdraw);
 
 /* ==================== EVENTS LISTENER ==================== */
 function listenEvents() {
