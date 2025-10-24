@@ -337,7 +337,7 @@ try {
   const incomeBal = fromUnits(info.incomeBal || 0);
 
   // ROI Income = pending (not yet claimed) + totalEarned (already claimed)
-  roiIncome = pending + totalEarned;
+ roiIncome = pending; // only current ROI, exclude old claimed
 
   // Instant Income = lifetime 10% referral reward (from Deposit event)
   // Contract stores combined balance, so here we simulate separation:
