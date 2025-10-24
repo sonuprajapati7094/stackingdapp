@@ -468,14 +468,15 @@ async function claim() {
   }
 }
 
-/* Withdraw request — this deducts from internal income balance immediately and creates request */
+// 🏧 WITHDRAW FUNCTION — fully working with refreshAll()
 async function withdraw() {
   try {
     if (!stakingContract || !signer) {
-      alert("Connect wallet first");
+      alert("Connect wallet first!");
       return;
     }
 
+    // Get entered amount
     const amtStr = document.getElementById("withdrawAmount").value;
     if (!amtStr || Number(amtStr) <= 0) {
       alert("Enter withdraw amount");
@@ -483,39 +484,56 @@ async function withdraw() {
     }
 
     const amt = Number(amtStr);
+
+    // Basic rules
     if (amt < 10 || amt % 10 !== 0) {
-      alert("Withdraw must be at least 10 USDT and multiple of 10");
+      alert("Minimum withdraw is 10 USDT (multiples of 10)");
       return;
     }
 
+    // Convert to token units
     const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-    const tx = await stakingContract.requestWithdraw(units);
-    await tx.wait();
 
-    // ✅ Confirmation
-    document.getElementById("withdrawStatus").innerText =
-      `Withdraw request of ${amt} USDT submitted successfully. Waiting for admin approval.`;
-
-    // ✅ Deduct from Total Wallet instantly (frontend update)
-    const totalWalletEl = document.getElementById("totalWallet");
-    const walletText = totalWalletEl.innerText.replace("USDT", "").trim();
-    let walletValue = parseFloat(walletText);
-    if (!isNaN(walletValue)) {
-      walletValue = Math.max(walletValue - amt, 0);
-      totalWalletEl.innerText = toFixedNumber(walletValue, 6) + " USDT";
+    // Make sure enough balance in availableWallet (totalWallet - withdrawn)
+    const totalWalletText = document.getElementById("totalWallet").innerText;
+    const totalWalletValue = parseFloat(totalWalletText);
+    if (amt > totalWalletValue) {
+      alert("Insufficient wallet balance!");
+      return;
     }
 
-    // ✅ Re-sync blockchain data after 2 seconds
-    setTimeout(async () => {
-      await refreshAll();
-    }, 2000);
+    // Confirm action
+    if (!confirm(`Confirm withdrawal of ${amt} USDT?`)) return;
+
+    // Send transaction to contract
+    const tx = await stakingContract.requestWithdraw(units);
+    document.getElementById("withdrawStatus").innerText = "Processing...";
+    await tx.wait();
+
+    document.getElementById("withdrawStatus").innerText =
+      "✅ Withdrawal request submitted successfully!";
+
+    // Reduce total wallet value instantly in UI
+    const newWallet = totalWalletValue - amt;
+    document.getElementById("totalWallet").innerText =
+      toFixedNumber(newWallet, 6) + " USDT";
+
+    // Refresh all data again
+    await refreshAll();
 
   } catch (e) {
     console.error("Withdraw error:", e);
-    alert("Withdraw failed: " + (e.data?.message || e.message || e));
+    alert("Withdraw failed: " + (e?.data?.message || e?.message || e));
   }
 }
 
+// ✅ Attach event listener safely after DOM loads
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("withdrawBtn");
+  if (btn) {
+    btn.addEventListener("click", withdraw);
+  }
+});
 /* ==================== EVENTS LISTENER ==================== */
 function listenEvents() {
   try {
