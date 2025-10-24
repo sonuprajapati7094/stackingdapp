@@ -228,31 +228,12 @@ function fromUnits(valueBn) {
   catch(e) { return Number(valueBn) / (10 ** TOKEN_DECIMALS); }
 }
 
-/* ==================== CONNECT ==================== */
-async function connect() {
-  try {
-    if (!window.ethereum) { alert("MetaMask not found"); return; }
-    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-    await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    account = await signer.getAddress();
-    document.getElementById("walletDisplay").innerText = account;
-
-    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-    tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-
-    try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch(e){ console.warn("decimals read failed, using default", TOKEN_DECIMALS); }
-
-    document.getElementById("referralInput").value = window.location.origin + window.location.pathname + "?ref=" + account;
-    localStorage.setItem("staking_connected", account);
-
     await refreshAll();
     listenEvents();
-  } catch (err) {
+   cach (err) 
     console.error("connect error", err);
     alert("Connect failed: " + (err.message || err));
-  }
-}
+
 document.getElementById("connectBtn").addEventListener("click", connect);
 
 /* auto reconnect */
@@ -398,7 +379,23 @@ async function refreshAll() {
     console.error("refreshAll error:", err);
   }
 }
+/* ==================== CONNECT ==================== */
+async function connect() {
+  try {
+    if (!window.ethereum) { alert("MetaMask not found"); return; }
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    await provider.send("eth_requestAccounts", []);
+    signer = provider.getSigner();
+    account = await signer.getAddress();
+    document.getElementById("walletDisplay").innerText = account;
 
+    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+    tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+
+    try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch(e){ console.warn("decimals read failed, using default", TOKEN_DECIMALS); }
+
+    document.getElementById("referralInput").value = window.location.origin + window.location.pathname + "?ref=" + account;
+    localStorage.setItem("staking_connected", account);
 
 async function stake() {
   try {
