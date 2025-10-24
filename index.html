@@ -488,34 +488,6 @@ async function approveQuick() {
 }
 document.getElementById("quickApproveBtn").addEventListener("click", approveQuick);
 
-// 🧾 Deduct all previous withdrawals (pending or approved)
-let totalWithdrawed = 0;
-try {
-  const countBn = await stakingContract.withdrawRequestsCount();
-  const count = Number(countBn || 0);
-
-  for (let i = 1; i <= count; i++) {
-    const req = await stakingContract.getWithdrawRequest(i);
-    if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
-      // Only count approved & pending requests (status 0 or 1)
-      if (req.status === 0 || req.status === 1) {
-        totalWithdrawed += fromUnits(req.amount || 0);
-      }
-    }
-  }
-} catch (e) {
-  console.warn("Withdraw fetch failed:", e);
-}
-
-// 🧮 Calculate final wallet balance after deduction
-let netWallet = incomeBal + pending - totalWithdrawed;
-if (netWallet < 0) netWallet = 0;
-
-// Show in UI
-document.getElementById("totalWallet").innerText =
-  toFixedNumber(netWallet, 6) + " USDT";
-
-
 async function stake() {
   try {
     if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
