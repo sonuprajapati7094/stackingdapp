@@ -1,4 +1,4 @@
-Index.html old code   <!DOCTYPE html>
+Index.html old code<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -266,24 +266,39 @@ async function refreshAll() {
   if (!stakingContract || !account) return;
 
   try {
-    // 🧠 Basic Token Info
+    // Basic wallet info
     let rawBal = await tokenContract.balanceOf(account);
     let walletBal = fromUnits(rawBal);
     document.getElementById("walletDisplay").innerText =
       `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
 
-    // 🧾 Fetch User Info
+    // User data
     const info = await stakingContract.getUserInfo(account);
     const staked = fromUnits(info.staked || 0);
     const pending = fromUnits(info.pending || 0);
     const incomeBal = fromUnits(info.incomeBal || 0);
     const totalEarned = fromUnits(info.totalEarned || 0);
 
-    // ==================== 📊 Team & Business ====================
+    // ROI (daily reward part)
+    const roiIncome = pending;
+
+    // Instant income (10% one-time on direct deposits)
+    const instantIncome = staked > 0 ? staked * 0.1 : 0;
+
+    // Level income (ROI based — future logic placeholder)
+    const LEVEL_PERCENT = [10, 10, 5, 3, 2, 1, 1, 1, 1, 1];
+    let levelIncome = 0;
+
     const directs = await stakingContract.getDirectRefs(account);
+    for (let i = 0; i < directs.length; i++) {
+      const dInfo = await stakingContract.getUserInfo(directs[i]);
+      const dPending = fromUnits(dInfo.pending || 0);
+      levelIncome += (dPending * LEVEL_PERCENT[0]) / 100; // Only 1st level ROI share
+    }
+
+    // Team Business Count
     let teamBusiness = 0;
     let indirectCount = 0;
-
     for (let i = 0; i < directs.length; i++) {
       const u = await stakingContract.getUserInfo(directs[i]);
       const st = fromUnits(u.staked || 0);
@@ -304,8 +319,9 @@ async function refreshAll() {
     document.getElementById("teamBusiness").innerText =
       toFixedNumber(teamBusiness, 6) + " USDT";
 
-    // ==================== 🧮 Active / Inactive ====================
-    let active = 0, inactive = 0;
+    // Active/Inactive count
+    let active = 0,
+      inactive = 0;
     for (let i = 0; i < directs.length; i++) {
       const u = await stakingContract.getUserInfo(directs[i]);
       if (Number(ethers.utils.formatUnits(u.staked || 0, TOKEN_DECIMALS)) > 0)
@@ -314,40 +330,11 @@ async function refreshAll() {
     }
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // ==================== 💰 Income Logic ====================
-    // 1️⃣ ROI Income (daily from staking)
-    const roiIncome = pending;
-
-    // 2️⃣ Instant Income (10% of direct deposits)
-    const instantIncome = staked > 0 ? (staked * 0.1) : 0;
-
-    // 3️⃣ Level Income — ROI-based from 10 levels
-    const LEVEL_PERCENT = [10, 10, 5, 3, 2, 1, 1, 1, 1, 1]; // Level-wise %
-    let levelIncome = 0;
-
-    async function calcLevelIncome(wallet, level = 0) {
-      if (level >= LEVEL_PERCENT.length) return;
-      const refs = await stakingContract.getDirectRefs(wallet);
-      for (let i = 0; i < refs.length; i++) {
-        const refInfo = await stakingContract.getUserInfo(refs[i]);
-        const refPending = fromUnits(refInfo.pending || 0);
-        const levelShare = (refPending * LEVEL_PERCENT[level]) / 100;
-        levelIncome += levelShare;
-        await calcLevelIncome(refs[i], level + 1);
-      }
-    }
-
-    await calcLevelIncome(account, 0);
-
-    // 4️⃣ Total Wallet (before withdraw deduction)
-    let totalWalletBeforeWithdraw = roiIncome + instantIncome + levelIncome;
-
-    // ==================== 🧾 Deduct Old Withdrawals ====================
+    // Withdrawal deduction
     let totalWithdrawed = 0;
     try {
       const countBn = await stakingContract.withdrawRequestsCount();
       const count = Number(countBn || 0);
-
       for (let i = 1; i <= count; i++) {
         const req = await stakingContract.getWithdrawRequest(i);
         if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
@@ -360,10 +347,26 @@ async function refreshAll() {
       console.warn("Withdraw fetch failed:", e);
     }
 
-    let availableWallet = totalWalletBeforeWithdraw - totalWithdrawed;
-    if (availableWallet < 0) availableWallet = 0;
+    // Final wallet calc (ROI + Instant + Level - Withdrawals)
+    const totalWallet =
+      roiIncome + instantIncome + levelIncome - totalWithdrawed;
+    const finalWallet = totalWallet < 0 ? 0 : totalWallet;
 
-    // ==================== 📅 Staking Info ====================
+    // Update UI
+    document.getElementById("stakedDisplay").innerText =
+      toFixedNumber(staked, 6) + " USDT";
+    document.getElementById("targetDisplay").innerText =
+      toFixedNumber(staked * 3, 6) + " USDT";
+    document.getElementById("roiPending").innerText =
+      toFixedNumber(roiIncome, 6) + " USDT";
+    document.getElementById("instantIncome").innerText =
+      toFixedNumber(instantIncome, 6) + " USDT";
+    document.getElementById("levelIncome").innerText =
+      toFixedNumber(levelIncome, 6) + " USDT";
+    document.getElementById("totalWallet").innerText =
+      toFixedNumber(finalWallet, 6) + " USDT";
+
+    // 3x calculation
     const dailyRate = 0.01;
     let daysTo3x = 0;
     if (staked > 0) {
@@ -372,30 +375,14 @@ async function refreshAll() {
       const remaining = Math.max(staked * 3 - already, 0);
       daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
     }
-
-    // ==================== 🧩 Update Dashboard UI ====================
-    document.getElementById("stakedDisplay").innerText =
-      toFixedNumber(staked, 6) + " USDT";
-    document.getElementById("targetDisplay").innerText =
-      toFixedNumber(staked * 3, 6) + " USDT";
     document.getElementById("days3x").innerText = daysTo3x + " days";
     document.getElementById("pkgStatus").innerText =
       staked > 0 ? "Active" : "Inactive";
 
-    // ==================== 🪙 Income Boxes ====================
-    document.getElementById("instantIncome").innerText =
-      toFixedNumber(instantIncome, 6) + " USDT";
-    document.getElementById("levelIncome").innerText =
-      toFixedNumber(levelIncome, 6) + " USDT";
-    document.getElementById("roiPending").innerText =
-      toFixedNumber(roiIncome, 6) + " USDT";
-    document.getElementById("totalWallet").innerText =
-      toFixedNumber(availableWallet, 6) + " USDT";
-
-    // ==================== 🧾 Withdraw History ====================
+    // Withdraw history
     await loadWithdrawHistory();
 
-    // ==================== 🧭 Level Unlock Logic ====================
+    // Level unlock logic
     const levelsTbody = document.getElementById("levelsTbody");
     if (levelsTbody) {
       const rows = levelsTbody.querySelectorAll("tr");
@@ -403,15 +390,14 @@ async function refreshAll() {
       for (let i = 0; i < rows.length; i++) {
         const statusCell = rows[i].querySelector("td:last-child");
         if (!statusCell) continue;
-        if (i < openLevels) statusCell.innerHTML = "Open ✅";
-        else statusCell.innerHTML = "Pending";
+        statusCell.innerHTML = i < openLevels ? "Open ✅" : "Pending";
       }
     }
-
   } catch (err) {
     console.error("refreshAll error:", err);
   }
 }
+
 /* ========== Approve / Stake / Claim / Withdraw ========== */
 async function approveQuick() {
   try {
