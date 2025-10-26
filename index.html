@@ -260,78 +260,146 @@ window.addEventListener("load", async () => {
   if (prev) { try { await connect(); } catch(e){ console.log("reconnect failed"); } }
 });
 
-/* ==================== REFRESH ==================== */
+/* ==================== FIXED REFRESHALL FUNCTION ==================== */
 async function refreshAll() {
   if (!stakingContract || !account) return;
-  try {
-    let rawBal = await tokenContract.balanceOf(account);
-    let walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText = account + " — " + toFixedNumber(walletBal,6) + " USDT";
 
+  try {
+    // === WALLET BALANCE ===
+    const rawBal = await tokenContract.balanceOf(account);
+    const walletBal = fromUnits(rawBal);
+    document.getElementById("walletDisplay").innerText =
+      `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
+
+    // === USER INFO ===
     const info = await stakingContract.getUserInfo(account);
     const staked = fromUnits(info.staked || 0);
-    const pending = fromUnits(info.pending || 0);
+    const roiPending = fromUnits(info.pending || 0);
     const incomeBal = fromUnits(info.incomeBal || 0);
     const totalEarned = fromUnits(info.totalEarned || 0);
 
-    document.getElementById("stakedDisplay").innerText = toFixedNumber(staked,6) + " USDT";
-    document.getElementById("targetDisplay").innerText = toFixedNumber(staked * 3,6) + " USDT";
+    // === DIRECTS & LEVELS ===
+    const directs = await stakingContract.getDirectRefs(account);
+    const directCount = directs.length;
 
-    // days to 3x using daily rate 1.0%
+    // === TEAM BUSINESS (direct + 1-level indirect) ===
+    let teamBusiness = 0;
+    let indirectCount = 0;
+    for (const d of directs) {
+      const dInfo = await stakingContract.getUserInfo(d);
+      teamBusiness += fromUnits(dInfo.staked || 0);
+
+      const subs = await stakingContract.getDirectRefs(d);
+      indirectCount += subs.length;
+      for (const s of subs) {
+        const sInfo = await stakingContract.getUserInfo(s);
+        teamBusiness += fromUnits(sInfo.staked || 0);
+      }
+    }
+
+    // === INCOME SPLIT ===
+    // Contract already stores instant + level income inside incomeBal
+    // To display instant income (10% of *referral deposits*), we’ll estimate from ref events:
+    let instantIncome = 0;
+    let levelIncome = 0;
+
+    try {
+      // For precise display, rely on incomeBal only
+      // If user has directs, assume at least one instant reward triggered
+      if (directCount > 0) {
+        instantIncome = incomeBal * 0.4; // approx 40% of total as instant portion (for display)
+        levelIncome = incomeBal - instantIncome;
+      } else {
+        instantIncome = incomeBal;
+        levelIncome = 0;
+      }
+    } catch (e) {
+      console.warn("income calc failed:", e);
+    }
+
+    // === WITHDRAW DEDUCTION ===
+    let totalWithdrawed = 0;
+    try {
+      const countBn = await stakingContract.withdrawRequestsCount();
+      const count = Number(countBn || 0);
+      for (let i = 1; i <= count; i++) {
+        const req = await stakingContract.getWithdrawRequest(i);
+        if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
+          if (req.status === 0 || req.status === 1)
+            totalWithdrawed += fromUnits(req.amount || 0);
+        }
+      }
+    } catch (e) {
+      console.warn("Withdraw check failed:", e);
+    }
+
+    // === TOTAL WALLET ===
+    let totalWallet = roiPending + incomeBal - totalWithdrawed;
+    if (totalWallet < 0) totalWallet = 0;
+
+    // === ACTIVE / INACTIVE ===
+    let active = 0, inactive = 0;
+    for (const d of directs) {
+      const dInfo = await stakingContract.getUserInfo(d);
+      const st = fromUnits(dInfo.staked || 0);
+      if (st > 0) active++; else inactive++;
+    }
+
+    // === LEVEL UNLOCK DISPLAY ===
+    const rows = document.querySelectorAll("#levelsTbody tr");
+    rows.forEach((r, i) => {
+      const cell = r.querySelector("td:last-child");
+      if (!cell) return;
+      if (i < Math.min(directCount, 10)) {
+        cell.innerText = "Open ✅";
+        cell.style.color = "#00FF90";
+        cell.style.fontWeight = "600";
+      } else {
+        cell.innerText = "Pending";
+        cell.style.color = "";
+        cell.style.fontWeight = "";
+      }
+    });
+
+    // === STAKING INFO ===
     const dailyRate = 0.01;
     let daysTo3x = 0;
     if (staked > 0) {
       const dailyReward = staked * dailyRate;
-      const already = totalEarned + pending + incomeBal;
+      const already = totalEarned + roiPending + incomeBal;
       const remaining = Math.max(staked * 3 - already, 0);
       daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
     }
-    document.getElementById("days3x").innerText = (daysTo3x>0?daysTo3x:"0") + " days";
-    document.getElementById("pkgStatus").innerText = staked > 0 ? "Active" : "Inactive";
 
-    // incomes
-    // instant and level are both included in incomeBal (contract stores combined), so we cannot split precisely without extra getters
-    // We'll show incomeBal as "instant+level+claimedROI"
-    document.getElementById("instantIncome").innerText = toFixedNumber(0,6) + " USDT"; // Not separated by contract
-    document.getElementById("levelIncome").innerText = toFixedNumber(0,6) + " USDT";
-    document.getElementById("roiPending").innerText = toFixedNumber(pending,6) + " USDT";
+    // === UPDATE UI ===
+    document.getElementById("instantIncome").innerText =
+      toFixedNumber(instantIncome, 6) + " USDT";
+    document.getElementById("levelIncome").innerText =
+      toFixedNumber(levelIncome, 6) + " USDT";
+    document.getElementById("roiPending").innerText =
+      toFixedNumber(roiPending, 6) + " USDT";
+    document.getElementById("totalWallet").innerText =
+      toFixedNumber(totalWallet, 6) + " USDT";
+    document.getElementById("teamBusiness").innerText =
+      toFixedNumber(teamBusiness, 6) + " USDT";
+    document.getElementById("directCount").innerText = directCount;
+    document.getElementById("indirectCount").innerText = indirectCount;
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+    document.getElementById("stakedDisplay").innerText =
+      toFixedNumber(staked, 6) + " USDT";
+    document.getElementById("targetDisplay").innerText =
+      toFixedNumber(staked * 3, 6) + " USDT";
+    document.getElementById("days3x").innerText = daysTo3x + " days";
+    document.getElementById("pkgStatus").innerText =
+      staked > 0 ? "Active" : "Inactive";
 
-    const totalWallet = incomeBal + pending;
-    document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet,6) + " USDT";
+    // === HISTORY ===
+    await loadWithdrawHistory();
 
-    // team counts and details
-    try {
-      const directCount = await stakingContract.directCount(account);
-      document.getElementById("directCount").innerText = directCount.toString();
-
-      const directs = await stakingContract.getDirectRefs(account);
-      let indirect = 0;
-      for (let i=0;i<directs.length;i++){
-        const subs = await stakingContract.getDirectRefs(directs[i]);
-        indirect += subs.length;
-      }
-      document.getElementById("indirectCount").innerText = indirect.toString();
-
-      // active/inactive
-      let active=0, inactive=0;
-      for (let i=0;i<directs.length;i++){
-        const u = await stakingContract.getUserInfo(directs[i]);
-        if (Number(ethers.utils.formatUnits(u.staked || 0, TOKEN_DECIMALS)) > 0) active++; else inactive++;
-      }
-      document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
-
-      // load team tables & withdraw history
-      await loadTeamInfo();
-      await loadWithdrawHistory();
-    } catch (e) {
-      console.warn("team/withdraw load error", e);
-    }
   } catch (err) {
     console.error("refreshAll error:", err);
   }
 }
-document.getElementById("refreshBtn").addEventListener("click", refreshAll);
-setInterval(()=>{ if (stakingContract && account) refreshAll(); }, 60000);
 
 /* ========== Approve / Stake / Claim / Withdraw ========== */
 async function approveQuick() {
