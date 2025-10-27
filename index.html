@@ -258,12 +258,16 @@ async function sumReferralEventsFor(accountAddr) {
   if (!provider) return 0;
   try {
     const iface = new ethers.utils.Interface(STAKING_ABI);
-    const filter = stakingContract.filters.ReferralCredited(accountAddr); // referrer indexed
-    const logs = await provider.getLogs({ address: STAKING_ADDRESS, fromBlock: 0, toBlock: 'latest', topics: filter.topics });
+    const filter = stakingContract.filters.ReferralCredited(accountAddr, null); // ✅ corrected
+    const logs = await provider.getLogs({
+      address: STAKING_ADDRESS,
+      fromBlock: 0,
+      toBlock: "latest",
+      topics: filter.topics,
+    });
     let sumUnits = ethers.BigNumber.from(0);
     for (const l of logs) {
       const parsed = iface.parseLog(l);
-      // parsed.args: [referrer, from, amountUnits]
       const amountUnits = parsed.args.amountUnits;
       sumUnits = sumUnits.add(amountUnits);
     }
@@ -278,12 +282,16 @@ async function sumLevelEventsFor(accountAddr) {
   if (!provider) return 0;
   try {
     const iface = new ethers.utils.Interface(STAKING_ABI);
-    const filter = stakingContract.filters.LevelCredited(accountAddr); // levelUser indexed
-    const logs = await provider.getLogs({ address: STAKING_ADDRESS, fromBlock: 0, toBlock: 'latest', topics: filter.topics });
+    const filter = stakingContract.filters.LevelCredited(accountAddr, null); // ✅ corrected
+    const logs = await provider.getLogs({
+      address: STAKING_ADDRESS,
+      fromBlock: 0,
+      toBlock: "latest",
+      topics: filter.topics,
+    });
     let sumUnits = ethers.BigNumber.from(0);
     for (const l of logs) {
       const parsed = iface.parseLog(l);
-      // parsed.args: [levelUser, from, level, amountUnits]
       const amountUnits = parsed.args.amountUnits;
       sumUnits = sumUnits.add(amountUnits);
     }
