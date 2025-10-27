@@ -414,6 +414,7 @@ try {
     let totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
     if (totalWallet < 0) totalWallet = 0;
 
+    
     // === UPDATE UI ===
     document.getElementById("instantIncome").innerText =
       toFixedNumber(instantIncome, 6) + " USDT";
