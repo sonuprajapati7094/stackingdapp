@@ -400,12 +400,14 @@ try {
   }
 
   // 🔹 Step 2: Level income = incomeBalance - instantIncome
-  levelIncome = incomeBal - instantIncome;
+  
+let levelIncome = incomeBal; // directly show income balance from contract
   if (levelIncome < 0) levelIncome = 0;
 
   // 🔹 Step 3: Total wallet = instant + level + ROI pending - all withdrawals
-  totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
-  if (totalWallet < 0) totalWallet = 0;
+
+let totalWallet = roiPending + levelIncome - totalWithdrawed;
+if (totalWallet < 0) totalWallet = 0;
 
   // 🔹 Step 4: Update UI (safe with fallback)
   document.getElementById("instantIncome").innerText =
