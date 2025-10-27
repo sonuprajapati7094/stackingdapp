@@ -380,50 +380,34 @@ async function refreshAll() {
       }
     } catch (err) { console.warn("Withdraw check error", err); }
 
- // === INCOME LOGIC ===
-    // ✅ Instant income = 10 % of direct deposits
-    let directBusiness = 0;
-    for (const d of directs) {
-      const dInfo = await stakingContract.getUserInfo(d);
-      directBusiness += fromUnits(dInfo.staked || 0);
+// === INCOME SPLIT ===
+// Fetch instant income (10% of directs’ total deposits)
+let instantIncome = 0;
+if (directs.length > 0) {
+  const directInfos = await Promise.all(directs.map(d => stakingContract.getUserInfo(d).catch(() => null)));
+  for (const info of directInfos) {
+    if (info) {
+      const st = fromUnits(info.staked || 0);
+      instantIncome += st * 0.10; // 10% of each direct’s total stake
     }
-    const instantIncome = directBusiness * 0.10;
-
-    // === FETCH ONCHAIN LEVEL INCOME (if exists) ===
-let onchainLevelIncome = 0;
-try {
-  if (stakingContract.levelIncome) {
-    const lvlRaw = await stakingContract.levelIncome(account);
-    onchainLevelIncome = fromUnits(lvlRaw);
-    console.log("✅ onchain levelIncome fetched:", onchainLevelIncome);
-  } else if (stakingContract.getLevelIncome) {
-    const lvlRaw = await stakingContract.getLevelIncome(account);
-    onchainLevelIncome = fromUnits(lvlRaw);
-    console.log("✅ getLevelIncome fetched:", onchainLevelIncome);
   }
-} catch (e) {
-  console.warn("⚠️ levelIncome() function not found in contract");
 }
 
-    // ✅ Level income = incomeBal - instantIncome
-   const levelIncome = onchainLevelIncome > 0
-  ? onchainLevelIncome
-  : Math.max(incomeBal - instantIncome, 0);
+// Level income = everything in incomeBalance beyond instant income
+let levelIncome = incomeBal - instantIncome;
+if (levelIncome < 0.000001) levelIncome = 0;
 
-    // ✅ Total Wallet = (Instant + Level + ROI) - Withdrawals
-    let totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
-    if (totalWallet < 0) totalWallet = 0;
+// Total wallet = ROI pending + income balance - all withdrawals
+let totalWallet = roiPending + incomeBal - totalWithdrawed;
+if (totalWallet < 0) totalWallet = 0;
 
-    
-    // === UPDATE UI ===
-    document.getElementById("instantIncome").innerText =
-      toFixedNumber(instantIncome, 6) + " USDT";
-    document.getElementById("levelIncome").innerText =
-      toFixedNumber(levelIncome, 6) + " USDT";
-    document.getElementById("roiPending").innerText =
-      toFixedNumber(roiPending, 6) + " USDT";
-    document.getElementById("totalWallet").innerText =
-      toFixedNumber(totalWallet, 6) + " USDT";
+// === Update UI ===
+document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome, 6) + " USDT";
+document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome, 6) + " USDT";
+document.getElementById("roiPending").innerText = toFixedNumber(roiPending, 6) + " USDT";
+document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
+
+console.log("Instant =", instantIncome.toFixed(2), "Level =", levelIncome.toFixed(2), "incomeBal =", incomeBal.toFixed(2));
 
 
     // === STAKING INFO ===
