@@ -348,19 +348,36 @@ async function refreshAll() {
       }
     }
 
-    // ---- Income + wallet calc (no event logs)
-    let instantIncome = 0, levelIncome = 0, totalWithdrawed = 0;
-    try {
-      // instant = 10 % of total direct business
-      let directBusiness = 0;
-      for (const d of directs) {
-        const dInfo = await stakingContract.getUserInfo(d);
-        directBusiness += fromUnits(dInfo.staked || 0);
-      }
-      instantIncome = directBusiness * 0.10;
+   // === INCOME + TOTAL WALLET (direct calculation with separate levelIncome support) ===
+let instantIncome = 0;
+let levelIncome = 0;
+let totalWithdrawed = 0;
 
-      // level = rest of incomeBal
-      levelIncome = Math.max(incomeBal - instantIncome, 0);
+try {
+  // Instant income = 10% of total direct business
+  const directInfos = await Promise.all(
+    directs.map(a => stakingContract.getUserInfo(a).catch(() => null))
+  );
+  let directBusiness = 0;
+  for (const dInfo of directInfos) {
+    if (dInfo) directBusiness += fromUnits(dInfo.staked || 0);
+  }
+  instantIncome = directBusiness * 0.10;
+
+  // ✅ Check if contract has separate levelIncome storage
+  let onchainLevel = 0;
+  try {
+    onchainLevel = fromUnits(await stakingContract.levelIncome(account));
+  } catch (e) {
+    console.log("levelIncome() not found in contract, fallback to incomeBal split");
+  }
+
+  if (onchainLevel > 0) {
+    levelIncome = onchainLevel;
+  } else {
+    // fallback: if no separate function, derive from incomeBal
+    levelIncome = Math.max(incomeBal - instantIncome, 0);
+  }
 
       // withdraw deduction
       const totalReq = Number(await stakingContract.withdrawRequestsCount());
