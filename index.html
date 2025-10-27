@@ -414,16 +414,13 @@ try {
     let totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
     if (totalWallet < 0) totalWallet = 0;
 
-    
-    // === UPDATE UI ===
-    document.getElementById("instantIncome").innerText =
-      toFixedNumber(instantIncome, 6) + " USDT";
-    document.getElementById("levelIncome").innerText =
-      toFixedNumber(levelIncome, 6) + " USDT";
-    document.getElementById("roiPending").innerText =
-      toFixedNumber(roiPending, 6) + " USDT";
-    document.getElementById("totalWallet").innerText =
-      toFixedNumber(totalWallet, 6) + " USDT";
+
+// === Update UI ===
+document.getElementById("instantIncome").innerText = toFixedNumber(instantIncome, 6) + " USDT";
+document.getElementById("levelIncome").innerText = toFixedNumber(levelIncome, 6) + " USDT";
+document.getElementById("roiPending").innerText = toFixedNumber(roiPending, 6) + " USDT";
+document.getElementById("totalWallet").innerText = toFixedNumber(totalWallet, 6) + " USDT";
+
 
     // === STAKING INFO ===
     const dailyRate = 0.01;
