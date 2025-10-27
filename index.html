@@ -389,8 +389,26 @@ async function refreshAll() {
     }
     const instantIncome = directBusiness * 0.10;
 
+    // === FETCH ONCHAIN LEVEL INCOME (if exists) ===
+let onchainLevelIncome = 0;
+try {
+  if (stakingContract.levelIncome) {
+    const lvlRaw = await stakingContract.levelIncome(account);
+    onchainLevelIncome = fromUnits(lvlRaw);
+    console.log("✅ onchain levelIncome fetched:", onchainLevelIncome);
+  } else if (stakingContract.getLevelIncome) {
+    const lvlRaw = await stakingContract.getLevelIncome(account);
+    onchainLevelIncome = fromUnits(lvlRaw);
+    console.log("✅ getLevelIncome fetched:", onchainLevelIncome);
+  }
+} catch (e) {
+  console.warn("⚠️ levelIncome() function not found in contract");
+}
+
     // ✅ Level income = incomeBal - instantIncome
-    const levelIncome = Math.max(incomeBal - instantIncome, 0);
+   const levelIncome = onchainLevelIncome > 0
+  ? onchainLevelIncome
+  : Math.max(incomeBal - instantIncome, 0);
 
     // ✅ Total Wallet = (Instant + Level + ROI) - Withdrawals
     let totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
