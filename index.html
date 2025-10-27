@@ -306,24 +306,24 @@ async function sumLevelEventsFor(accountAddr) {
 async function refreshAll() {
   if (!stakingContract || !account) return;
   try {
-    // --- Wallet Display ---
+    // === WALLET BALANCE ===
     const rawBal = await tokenContract.balanceOf(account);
     const walletBal = fromUnits(rawBal);
     document.getElementById("walletDisplay").innerText =
       `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
 
-    // --- User Info ---
+    // === USER INFO ===
     const info = await stakingContract.getUserInfo(account);
     const staked = fromUnits(info.staked || 0);
     const roiPending = fromUnits(info.pending || 0);
     const incomeBal = fromUnits(info.incomeBal || 0);
     const totalEarned = fromUnits(info.totalEarned || 0);
 
-    // --- Directs ---
+    // === DIRECTS ===
     const directs = await stakingContract.getDirectRefs(account);
     const directCount = directs.length;
 
-    // --- Team Business + Indirect ---
+    // === TEAM BUSINESS + INDIRECTS ===
     let teamBusiness = 0;
     let indirectCount = 0;
     for (const d of directs) {
@@ -341,7 +341,7 @@ async function refreshAll() {
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
 
-    // --- Active / Inactive ---
+    // === ACTIVE / INACTIVE ===
     let active = 0, inactive = 0;
     for (const d of directs) {
       const dInfo = await stakingContract.getUserInfo(d);
@@ -350,7 +350,7 @@ async function refreshAll() {
     }
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // --- Level Unlocks ---
+    // === LEVEL UNLOCK LOGIC ===
     const rows = document.querySelectorAll("#levelsTbody tr");
     rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
@@ -366,7 +366,7 @@ async function refreshAll() {
       }
     });
 
-    // --- Withdraw Deductions ---
+    // === WITHDRAW DEDUCTIONS ===
     let totalWithdrawed = 0;
     try {
       const countBn = await stakingContract.withdrawRequestsCount();
@@ -380,17 +380,23 @@ async function refreshAll() {
       }
     } catch (err) { console.warn("Withdraw check error", err); }
 
-    // --- INCOME LOGIC ---
-    // ✅ Contract ke andar already instant + level income alag stored hota hai incomeBal me
-    // So: instant = 10% direct, level = incomeBal - instant (simple & accurate)
-    const instantIncome = teamBusiness * 0.10;
+    // === INCOME LOGIC ===
+    // ✅ Instant income = 10 % of direct deposits
+    let directBusiness = 0;
+    for (const d of directs) {
+      const dInfo = await stakingContract.getUserInfo(d);
+      directBusiness += fromUnits(dInfo.staked || 0);
+    }
+    const instantIncome = directBusiness * 0.10;
+
+    // ✅ Level income = incomeBal - instantIncome
     const levelIncome = Math.max(incomeBal - instantIncome, 0);
 
-    // ✅ Total Wallet includes ROI Pending + all internal incomes - withdrawals
-    let totalWallet = roiPending + incomeBal - totalWithdrawed;
+    // ✅ Total Wallet = (Instant + Level + ROI) - Withdrawals
+    let totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
     if (totalWallet < 0) totalWallet = 0;
 
-    // --- UI Update ---
+    // === UPDATE UI ===
     document.getElementById("instantIncome").innerText =
       toFixedNumber(instantIncome, 6) + " USDT";
     document.getElementById("levelIncome").innerText =
@@ -400,7 +406,7 @@ async function refreshAll() {
     document.getElementById("totalWallet").innerText =
       toFixedNumber(totalWallet, 6) + " USDT";
 
-    // --- Staking Info ---
+    // === STAKING INFO ===
     const dailyRate = 0.01;
     let daysTo3x = 0;
     if (staked > 0) {
@@ -417,17 +423,21 @@ async function refreshAll() {
     document.getElementById("pkgStatus").innerText =
       staked > 0 ? "Active" : "Inactive";
 
-    // --- History ---
+    // === HISTORY + TEAM TABLE ===
     await loadWithdrawHistory();
     await loadTeamInfo();
 
-    // --- Console Log (Debug) ---
-    console.log(`✅ REFRESHED:
-Instant Income: ${instantIncome.toFixed(2)}
-Level Income: ${levelIncome.toFixed(2)}
-ROI Pending: ${roiPending.toFixed(2)}
-Total Wallet: ${totalWallet.toFixed(2)}
-Team Business: ${teamBusiness.toFixed(2)}`);
+    // === DEBUG LOG ===
+    console.log(
+      `✅ Refresh Done:
+Direct Business = ${directBusiness.toFixed(2)}
+Instant Income = ${instantIncome.toFixed(2)}
+Level Income = ${levelIncome.toFixed(2)}
+ROI Pending = ${roiPending.toFixed(2)}
+Withdrawn = ${totalWithdrawed.toFixed(2)}
+Total Wallet = ${totalWallet.toFixed(2)}`
+    );
+
   } catch (err) {
     console.error("refreshAll error:", err);
   }
