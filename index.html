@@ -265,6 +265,7 @@ window.addEventListener("load", async () => {
         document.getElementById("connectBtn").innerText = "Connected ✅";
         listenEvents();
         document.getElementById("stakeBtn").addEventListener("click", stake);
+        document.getElementById("withdrawBtn").addEventListener("click", withdraw);
         await refreshAll();
       }
     } catch (e) { console.warn("Auto reconnect failed", e); }
