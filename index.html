@@ -507,6 +507,15 @@ async function stake() {
     document.getElementById("stakeBtn").innerText = "Processing...";
     await tx.wait();
     alert("Deposit successful");
+    try {
+  console.log("⏳ Claiming old ROI before new stake...");
+  const txClaim = await stakingContract.claimRewards();
+  await txClaim.wait();
+  console.log("✅ Old ROI claimed successfully");
+} catch (e) {
+  console.warn("No pending ROI or claim failed (safe to ignore)", e);
+}
+
     document.getElementById("stakeBtn").innerText = "Stake Now";
     await refreshAll();
   } catch (e) {
