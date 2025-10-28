@@ -487,7 +487,7 @@ Total Wallet = ${totalWallet.toFixed(2)}`
   }
 }
 
-/* ==================== STAKE (with old ROI auto-claim) ==================== */
+/* ==================== STAKE (fixed: old ROI preserved + referral fixed) ==================== */
 async function stake() {
   try {
     if (!stakingContract || !signer) {
@@ -509,27 +509,36 @@ async function stake() {
 
     const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
 
-    // ✅ Step 1: Auto-claim old ROI before new staking
-    try {
-      console.log("⏳ Claiming old ROI before new stake...");
-      const txClaim = await stakingContract.claimRewards();
-      await txClaim.wait();
-      console.log("✅ Old ROI claimed successfully");
-    } catch (e) {
-      console.warn("No pending ROI or claim skipped:", e.message || e);
+    // ✅ Step 1: Check old pending ROI
+    const info = await stakingContract.getUserInfo(account);
+    const pendingROI = Number(ethers.utils.formatUnits(info.pending || 0, TOKEN_DECIMALS));
+    console.log("Old pending ROI:", pendingROI);
+
+    // ✅ Step 2: Claim old ROI only if exists
+    if (pendingROI > 0.000001) {
+      try {
+        console.log("⏳ Claiming old ROI before new stake...");
+        const txClaim = await stakingContract.claimRewards();
+        await txClaim.wait();
+        console.log("✅ Old ROI claimed successfully");
+      } catch (e) {
+        console.warn("Claim failed (ignored):", e.message || e);
+      }
+    } else {
+      console.log("No pending ROI, skipping claim step");
     }
 
-    // ✅ Step 2: Find or assign referrer
+    // ✅ Step 3: Fix referral link
     let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
     if (!ref || !ethers.utils.isAddress(ref)) {
       try {
         ref = await stakingContract.owner();
-      } catch (e) {
+      } catch {
         ref = ethers.constants.AddressZero;
       }
     }
 
-    // ✅ Step 3: Execute deposit (staking)
+    // ✅ Step 4: Make deposit
     const btn = document.getElementById("stakeBtn");
     btn.innerText = "Processing...";
     btn.disabled = true;
@@ -541,7 +550,6 @@ async function stake() {
     btn.innerText = "Stake Now";
     btn.disabled = false;
 
-    // ✅ Step 4: Refresh all balances and UI
     await refreshAll();
 
   } catch (e) {
@@ -552,9 +560,6 @@ async function stake() {
     btn.disabled = false;
   }
 }
-
-/* ✅ Attach event listener (required for button to work) */
-document.getElementById("stakeBtn").addEventListener("click", stake);
 
 async function claim() {
   try {
