@@ -487,44 +487,75 @@ Total Wallet = ${totalWallet.toFixed(2)}`
   }
 }
 
+/* ==================== STAKE (with old ROI auto-claim) ==================== */
 async function stake() {
   try {
-    if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
-    const amtStr = document.getElementById("stakeAmount").value;
-    if (!amtStr || Number(amtStr) <= 0) { alert("Enter stake amount"); return; }
-    const amt = Number(amtStr);
-    if (amt < 20 || (amt % 20) !== 0) { alert("Stake must be at least 20 USDT and multiple of 20"); return; }
-    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-
-    // resolve referrer
-    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
-    if (!ref || !ethers.utils.isAddress(ref)) {
-      try { ref = await stakingContract.owner(); } catch (e) { ref = ethers.constants.AddressZero; }
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
     }
 
-    // Call deposit (uncomment or ensure deposit exists). Removed for "safe" template if missing.
-    const tx = await stakingContract.deposit(units, ref);
-    document.getElementById("stakeBtn").innerText = "Processing...";
-    await tx.wait();
-    alert("Deposit successful");
-    try {
-  console.log("⏳ Claiming old ROI before new stake...");
-  const txClaim = await stakingContract.claimRewards();
-  await txClaim.wait();
-  console.log("✅ Old ROI claimed successfully");
-} catch (e) {
-  console.warn("No pending ROI or claim failed (safe to ignore)", e);
-}
+    const amtStr = document.getElementById("stakeAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter stake amount");
+      return;
+    }
 
-    document.getElementById("stakeBtn").innerText = "Stake Now";
+    const amt = Number(amtStr);
+    if (amt < 20 || amt % 20 !== 0) {
+      alert("Stake must be at least 20 USDT and multiple of 20");
+      return;
+    }
+
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // ✅ Step 1: Auto-claim old ROI before new staking
+    try {
+      console.log("⏳ Claiming old ROI before new stake...");
+      const txClaim = await stakingContract.claimRewards();
+      await txClaim.wait();
+      console.log("✅ Old ROI claimed successfully");
+    } catch (e) {
+      console.warn("No pending ROI or claim skipped:", e.message || e);
+    }
+
+    // ✅ Step 2: Find or assign referrer
+    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
+    if (!ref || !ethers.utils.isAddress(ref)) {
+      try {
+        ref = await stakingContract.owner();
+      } catch (e) {
+        ref = ethers.constants.AddressZero;
+      }
+    }
+
+    // ✅ Step 3: Execute deposit (staking)
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Processing...";
+    btn.disabled = true;
+
+    const tx = await stakingContract.deposit(units, ref);
+    await tx.wait();
+
+    alert("✅ Deposit successful!");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
+
+    // ✅ Step 4: Refresh all balances and UI
     await refreshAll();
+
   } catch (e) {
     console.error("stake error", e);
     alert("Stake failed: " + (e?.data?.message || e?.message || e));
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
   }
 }
 
-// claim - assumes function name claimRewards()
+/* ✅ Attach event listener (required for button to work) */
+document.getElementById("stakeBtn").addEventListener("click", stake);
+
 async function claim() {
   try {
     if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
