@@ -487,72 +487,35 @@ Total Wallet = ${totalWallet.toFixed(2)}`
   }
 }
 
+
 async function stake() {
   try {
-    if (!stakingContract || !signer) {
-      alert("Connect wallet first");
-      return;
-    }
-
+    if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
     const amtStr = document.getElementById("stakeAmount").value;
-    if (!amtStr || Number(amtStr) <= 0) {
-      alert("Enter stake amount");
-      return;
-    }
-
+    if (!amtStr || Number(amtStr) <= 0) { alert("Enter stake amount"); return; }
     const amt = Number(amtStr);
-    if (amt < 20 || amt % 20 !== 0) {
-      alert("Stake must be at least 20 USDT and multiple of 20");
-      return;
-    }
+    if (amt < 20 || (amt % 20) !== 0) { alert("Stake must be at least 20 USDT and multiple of 20"); return; }
 
     const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
 
-    // ✅ Step 1: get pending ROI before new staking
-    const infoBefore = await stakingContract.getUserInfo(account);
-    const oldROI = Number(ethers.utils.formatUnits(infoBefore.pending || 0, TOKEN_DECIMALS));
-    console.log("Old ROI before stake:", oldROI);
-
-    // ✅ Step 2: referrer logic
+    // resolve referrer: prefer localStorage then URL param else owner
     let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
     if (!ref || !ethers.utils.isAddress(ref)) {
-      try {
-        ref = await stakingContract.owner();
-      } catch {
-        ref = ethers.constants.AddressZero;
-      }
+      try { ref = await stakingContract.owner(); } catch(e){ ref = ethers.constants.AddressZero; }
     }
-
-    // ✅ Step 3: execute staking
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Processing...";
-    btn.disabled = true;
 
     const tx = await stakingContract.deposit(units, ref);
     await tx.wait();
-    console.log("Deposit done");
-
-    // ✅ Step 4: Simulate crediting old ROI in frontend (since contract skipped it)
-    if (oldROI > 0) {
-      let totalWalletEl = document.getElementById("totalWallet");
-      let currentWallet = parseFloat(totalWalletEl.innerText.split(" ")[0]) || 0;
-      totalWalletEl.innerText = (currentWallet + oldROI).toFixed(6) + " USDT";
-      console.log("Simulated old ROI added:", oldROI);
-    }
-
-    alert("✅ Stake successful (ROI preserved visually)");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
+    alert("Deposit successful");
     await refreshAll();
-
   } catch (e) {
     console.error("stake error", e);
-    alert("Stake failed: " + (e?.data?.message || e?.message || e));
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
+    alert("Stake failed: " + (e.data?.message || e.message || e));
   }
 }
+document.getElementById("stakeBtn").addEventListener("click", stake);
+
+/* Claim ROI (this will credit user's internal income balance and distribute level income to uplines) */
 
 
 async function claim() {
