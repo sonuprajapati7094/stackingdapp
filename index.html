@@ -235,8 +235,10 @@ async function connect() {
 
     try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch (e) { TOKEN_DECIMALS = 6; }
 
-    document.getElementById("referralInput").value = `${window.location.origin}${window.location.pathname}?ref=${account}`;
-    localStorage.setItem("staking_connected", account);
+    // ✅ Robust referral link generator (works on GitHub pages, custom domain, localhost, all)
+const baseURL = window.location.href.split("?")[0]; 
+document.getElementById("referralInput").value = `${baseURL}?ref=${account}`;
+console.log("Referral link generated:", `${baseURL}?ref=${account}`);
 
     // Attach event listeners (contract events)
     listenEvents();
