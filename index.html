@@ -401,7 +401,7 @@ async function refreshAll() {
       }
     } catch (err) { console.warn("Withdraw check error", err); }
 
-// === INCOME SPLIT (AUTO ROI LEVEL DISTRIBUTION) ===
+// === INCOME SPLIT (FINAL FIXED) ===
 let instantIncome = 0;
 let levelIncome = 0;
 let totalWallet = 0;
@@ -420,30 +420,15 @@ try {
     }
   }
 
-  // 🔹 Step 2: Auto-calculate ROI-based Level Income (10 levels)
-  const levelPercents = [10,10,5,3,2,1,1,1,1,1];
-  const allLevels = await stakingContract.getTeamRefs(account);
-  let roiFromDownline = 0;
-
-  if (allLevels && allLevels.length > 0) {
-    for (let i = 0; i < allLevels.length && i < 10; i++) {
-      const usersAtLevel = allLevels[i];
-      const levelRate = levelPercents[i] / 100;
-
-      for (const userAddr of usersAtLevel) {
-        const userInfo = await stakingContract.getUserInfo(userAddr);
-        const userROI = fromUnits(userInfo.pending || 0);
-        roiFromDownline += userROI * levelRate;
-      }
-    }
-  }
-  levelIncome = roiFromDownline;
+  // 🔹 Step 2: Level income = incomeBalance - instantIncome
+  levelIncome = incomeBal - instantIncome;
+  if (levelIncome < 0) levelIncome = 0;
 
   // 🔹 Step 3: Total wallet = instant + level + ROI pending - all withdrawals
   totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
   if (totalWallet < 0) totalWallet = 0;
 
-  // 🔹 Step 4: Update UI
+  // 🔹 Step 4: Update UI (safe with fallback)
   document.getElementById("instantIncome").innerText =
     toFixedNumber(instantIncome, 6) + " USDT";
 
