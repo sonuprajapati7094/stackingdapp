@@ -369,15 +369,14 @@ const TOKEN_ABI = [
 let provider, signer, userAddress, stakingContract, tokenContract;
 
 async function initProvider() {
-  if (typeof window.ethereum === "undefined") {
-    alert("MetaMask not detected! Please install MetaMask extension.");
+  if (!window.ethereum) {
+    alert("MetaMask not detected!");
     return;
   }
 
-  // Initialize ethers provider with 'any' network
   provider = new ethers.providers.Web3Provider(window.ethereum, "any");
 
-  // Auto reload when account or network changes
+  // Auto reload on account / network change
   window.ethereum.on("accountsChanged", () => window.location.reload());
   window.ethereum.on("chainChanged", () => window.location.reload());
 }
@@ -388,47 +387,54 @@ async function connectWallet(auto = false) {
 
     const accounts = await provider.listAccounts();
 
+    // Only prompt if manual connect
     if (accounts.length === 0 && !auto) {
-      // ask permission only if not auto
       await provider.send("eth_requestAccounts", []);
     }
 
     signer = provider.getSigner();
     userAddress = await signer.getAddress();
 
-    // show connected status
-    document.getElementById("connectBtn").innerText = "Connected ✓";
-    document.getElementById("statusText").innerText = "Connected";
-    document.getElementById("addrDisplay").innerText = `Address: ${userAddress}`;
+    console.log("Wallet connected:", userAddress);
+    document.querySelector("#connectBtn").innerText = "Connected ✓";
+    document.querySelector("#statusText").innerText = "Connected";
+    document.querySelector("#addrDisplay").innerText = "Address: " + userAddress;
 
-    // initialize contracts
     stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
     tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
 
-    // set referral link
-    const refLinkInput = document.getElementById("refLink");
-    if (refLinkInput)
-      refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
+    if (document.querySelector("#refLink")) {
+      document.querySelector("#refLink").value =
+        `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
+    }
 
-    console.log("Wallet connected:", userAddress);
-    await refreshAll();
+    // Load dashboard or any default refresh
+    if (typeof refreshAll === "function") await refreshAll();
 
   } catch (err) {
-    console.error("Connection error:", err);
-    if (!auto) alert("Wallet connection failed. Please try again.");
+    console.error("Wallet connect failed:", err);
+    if (!auto) alert("Wallet connection failed. Check console for details.");
   }
 }
 
-// ✅ Auto run when page loads
-window.addEventListener("load", async () => {
+// ✅ This ensures button always binds after DOM loaded
+document.addEventListener("DOMContentLoaded", async () => {
   await initProvider();
 
-  // try auto connect (no popup)
-  await connectWallet(true);
+  const btn = document.querySelector("#connectBtn");
+  if (btn) {
+    btn.addEventListener("click", () => connectWallet(false));
+  }
 
-  // also allow manual button connect
-  const btn = document.getElementById("connectBtn");
-  if (btn) btn.addEventListener("click", () => connectWallet(false));
+  // Try auto connect silently
+  try {
+    const accounts = await provider.listAccounts();
+    if (accounts.length > 0) {
+      await connectWallet(true);
+    }
+  } catch (err) {
+    console.warn("Auto connect skipped:", err);
+  }
 });
 
 // approve large allowance
