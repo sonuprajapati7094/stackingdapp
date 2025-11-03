@@ -1,703 +1,792 @@
-<!doctype html>
-<html>
+Index.html Github Old code<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>USDT Staking — Dashboard (Pro Version)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <title>USDT Staking Dashboard</title>
+
+  <!-- ethers v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
-    :root{
-      --bg:#071014;
-      --card:#0e1416;
-      --muted:#9aa3a6;
-      --accent:#f6c84c;
-      --danger:#ff7676;
-      --success:#7cf58a;
-    }
-    *{box-sizing:border-box}
-    body{
-      background:var(--bg);
-      color:#fff;
-      font-family:Inter,system-ui,Arial;
-      margin:0;
-      padding:20px;
-    }
-    .wrap{max-width:1200px;margin:0 auto}
-    header{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      margin-bottom:20px
-    }
-    h1{margin:0;color:var(--accent)}
-    .btn{
-      background:var(--accent);
-      color:#000;
-      padding:8px 12px;
-      border-radius:8px;
-      border:none;
-      cursor:pointer;
-      font-weight:600
-    }
-    .btn-secondary{
-      background:rgba(255,255,255,0.05);
-      color:#fff
-    }
-    .card{
-      background:var(--card);
-      padding:16px;
-      border-radius:10px;
-      margin-bottom:14px;
-      box-shadow:0 6px 25px rgba(0,0,0,0.5)
-    }
-    .grid{
-      display:grid;
-      grid-template-columns:360px 1fr;
-      gap:18px
-    }
-    input,select{
-      width:100%;
-      padding:10px;
-      border-radius:8px;
-      border:1px solid rgba(255,255,255,0.05);
-      background:rgba(0,0,0,0.15);
-      color:#fff
-    }
-    table{width:100%;border-collapse:collapse}
-    th,td{
-      padding:6px 4px;
-      border-bottom:1px solid rgba(255,255,255,0.05);
-      font-size:13px;
-      text-align:left
-    }
-    .small{font-size:13px;color:var(--muted)}
-    .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-    .stat{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
-    .badge-open{background:rgba(124,245,138,0.1);color:var(--success)}
-    .badge-pending{background:rgba(246,200,76,0.12);color:var(--accent)}
-    .flex-between{display:flex;justify-content:space-between;align-items:center}
-    .history-box{max-height:200px;overflow:auto}
-    @media(max-width:1050px){
-      .grid{grid-template-columns:1fr}
-      .stat-row{grid-template-columns:repeat(2,1fr)}
-    }
+    :root { --bg:#0b0d0f; --card:#121416; --muted:#9aa4b2; --accent:#ffd86b; --panel:#0f1113; }
+    body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:#e6eef6;}
+    header{padding:18px 24px;text-align:center;background:linear-gradient(90deg,#081018,#0d1016);box-shadow:0 2px 8px rgba(0,0,0,0.5);}
+    header h1{margin:0;color:var(--accent);font-size:20px;letter-spacing:0.6px;}
+    .topbar{display:flex;justify-content:flex-end;gap:12px;padding:12px 24px;align-items:center;}
+    .wallet-btn{background:var(--accent);color:#000;padding:8px 14px;border-radius:8px;border:0;font-weight:600;cursor:pointer;}
+    .container{padding:20px;display:grid;grid-template-columns:360px 1fr;gap:18px;max-width:1180px;margin:18px auto;}
+    .left{display:flex;flex-direction:column;gap:14px;}
+    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.4);}
+    .card h2{margin:0 0 10px 0;color:var(--accent);font-size:16px;}
+    .muted{color:var(--muted);font-size:13px;}
+    input[type="number"],input[type="text"]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--panel);color:#fff;}
+    .small-btn{padding:10px 12px;border-radius:8px;border:0;background:#2a2f35;color:#fff;cursor:pointer;margin-top:8px;}
+    .accent-btn{background:var(--accent);color:#000;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:8px;}
+    .right{display:flex;flex-direction:column;gap:14px;}
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+    .value{font-size:18px;font-weight:700;color:#fff;}
+    .label{font-size:12px;color:var(--muted);margin-top:6px;}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+    th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left;}
+    th{color:var(--accent);font-weight:700;}
+    .center{text-align:center;}
+    .sm{font-size:12px;color:var(--muted);}
+    footer{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
+    @media(max-width:980px){.container{grid-template-columns:1fr;padding:12px;}.grid-4{grid-template-columns:repeat(2,1fr);}}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>USDT Staking — Dashboard</h1>
-      <div>
-        <span id="statusText" class="small">Not connected</span>
-        <button id="connectBtn" class="btn">Connect Wallet</button>
+<header><h1>USDT Staking — Dashboard</h1></header>
+
+<div class="topbar" style="max-width:1180px;margin:0 auto">
+  <div id="walletDisplay" class="sm muted">Not connected</div>
+  <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
+</div>
+
+<main class="container">
+  <div class="left">
+    <div class="card">
+      <h2>Stake USDT</h2>
+      <div class="sm muted">Minimum deposit: 20 USDT — multiples of 20 only</div>
+      <input id="stakeAmount" type="number" placeholder="20, 40, 60 ..." />
+      <button class="accent-btn" id="quickApproveBtn">Quick Approve</button>
+      <button class="accent-btn" id="stakeBtn">Stake Now</button>
+      <div class="sm" style="margin-top:10px;">Tip: Approve once (Quick Approve) then stake.</div>
+    </div>
+
+    <div class="card">
+      <h2>Your Referral Link</h2>
+      <input id="referralInput" type="text" readonly />
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="small-btn" id="copyRefBtn">Copy Link</button>
+        <button class="small-btn" id="showTeamBtn">Show Team</button>
       </div>
-    </header>
+      <div class="sm muted" style="margin-top:8px;">Share this link. Users who join via referral will credit you 10% instant (internal balance).</div>
+    </div>
 
-    <div class="grid">
-      <!-- LEFT PANEL -->
-      <div>
-        <div class="card">
-          <h3>Stake USDT</h3>
-          <div class="small">Min stake: <b>20 USDT</b></div>
-          <input id="stakeAmt" placeholder="Amount (e.g. 50)" style="margin-top:8px" />
-          <div style="margin-top:8px;display:flex;gap:8px">
-            <button id="approveBtn" class="btn">Approve</button>
-            <button id="stakeBtn" class="btn">Stake</button>
-          </div>
-          <div class="small" style="margin-top:10px">P2P Stake (without 5% fee):</div>
-          <input id="stakeForAddr" placeholder="Stake for wallet address" style="margin-top:6px" />
-          <button id="stakeForBtn" class="btn" style="margin-top:6px">Stake For (P2P)</button>
-        </div>
+    <div class="card">
+      <h2>Withdraw</h2>
+      <div class="sm muted">Minimum withdraw 10 USDT — multiples of 10. Withdrawals require admin approval.</div>
+      <input id="withdrawAmount" type="number" placeholder="10, 20, 30 ..." />
+      <button class="accent-btn" id="withdrawBtn">Request Withdraw</button>
+      <div id="withdrawStatus" class="sm" style="margin-top:8px;">No withdraw actions yet.</div>
+    </div>
+  </div>
 
-        <div class="card">
-          <h3>Your Referral Link</h3>
-          <input id="refLink" readonly />
-          <button id="copyLink" class="btn" style="margin-top:8px">Copy Referral Link</button>
-          <div class="small" style="margin-top:10px">
-            Users can register using your referral link even before staking,
-            but you will earn team income only after staking 20 USDT or more.
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>Level Income (Live)</h3>
-          <table>
-            <thead>
-              <tr><th>Level</th><th>%</th><th>Status</th><th>Earned</th></tr>
-            </thead>
-            <tbody id="levelsTbody">
-              <tr><td>L1</td><td>10%</td><td id="sL1" class="badge badge-pending">PENDING</td><td id="eL1">0.000000</td></tr>
-              <tr><td>L2</td><td>10%</td><td id="sL2" class="badge badge-pending">PENDING</td><td id="eL2">0.000000</td></tr>
-              <tr><td>L3</td><td>5%</td><td id="sL3" class="badge badge-pending">PENDING</td><td id="eL3">0.000000</td></tr>
-              <tr><td>L4</td><td>3%</td><td id="sL4" class="badge badge-pending">PENDING</td><td id="eL4">0.000000</td></tr>
-              <tr><td>L5</td><td>2%</td><td id="sL5" class="badge badge-pending">PENDING</td><td id="eL5">0.000000</td></tr>
-              <tr><td>L6</td><td>1%</td><td id="sL6" class="badge badge-pending">PENDING</td><td id="eL6">0.000000</td></tr>
-              <tr><td>L7</td><td>1%</td><td id="sL7" class="badge badge-pending">PENDING</td><td id="eL7">0.000000</td></tr>
-              <tr><td>L8</td><td>1%</td><td id="sL8" class="badge badge-pending">PENDING</td><td id="eL8">0.000000</td></tr>
-              <tr><td>L9</td><td>1%</td><td id="sL9" class="badge badge-pending">PENDING</td><td id="eL9">0.000000</td></tr>
-              <tr><td>L10</td><td>1%</td><td id="sL10" class="badge badge-pending">PENDING</td><td id="eL10">0.000000</td></tr>
-            </tbody>
-          </table>
-        </div>
+  <div class="right">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><h2>Wallet Balances & Income</h2><div class="sm muted">Instant / Level / ROI breakdown</div></div>
+        <div><button class="small-btn" id="refreshBtn">Refresh Now</button></div>
       </div>
 
-      <!-- RIGHT PANEL -->
-      <div>
-        <div class="card">
-          <div class="flex-between">
-            <div>
-              <div id="addrDisplay" class="small">Address: —</div>
-              <div id="balanceDisplay" class="small">USDT Balance: —</div>
-            </div>
-            <button id="refreshBtn" class="btn-secondary btn">Refresh</button>
-          </div>
-          <div class="stat-row" style="margin-top:12px">
-            <div class="stat"><div class="small">Instant Income</div><div id="instantIncome" style="font-weight:700">0.000000</div></div>
-            <div class="stat"><div class="small">Level Income</div><div id="levelIncome" style="font-weight:700">0.000000</div></div>
-            <div class="stat"><div class="small">ROI Income</div><div id="roiIncome" style="font-weight:700">0.000000</div></div>
-            <div class="stat"><div class="small">Total Wallet</div><div id="totalWallet" style="font-weight:700">0.000000</div></div>
-            <div class="stat"><div class="small">Days to 3×</div><div id="days3x" style="font-weight:700">—</div></div>
-          </div>
+      <div style="margin-top:12px" class="grid-4">
+        <div class="card" style="background:#0b0d0f;padding:12px;">
+          <div class="label">Instant Income</div>
+          <div class="value" id="instantIncome">0.000000 USDT</div>
         </div>
-        <!-- Withdrawal Section -->
-        <div class="card">
-          <h3>Withdraw</h3>
-          <div class="small">Minimum withdraw 20 USDT | 5 % fee on withdrawal.</div>
-          <input id="withdrawAmt" placeholder="Enter withdraw amount" style="margin-top:8px" />
-          <div style="margin-top:8px;display:flex;gap:8px">
-            <button id="requestWithdraw" class="btn">Request Withdraw</button>
-            <button id="refreshWithdrawals" class="btn-secondary btn">Refresh</button>
-          </div>
-          <div id="withdrawMsg" class="small" style="margin-top:8px">No withdraws yet.</div>
+        <div class="card" style="background:#0b0d0f;padding:12px;">
+          <div class="label">Level income</div>
+          <div class="value" id="levelIncome">0.000000 USDT</div>
         </div>
+        <div class="card" style="background:#0b0d0f;padding:12px;">
+          <div class="label">ROI Pending</div>
+          <div class="value" id="roiPending">0.000000 USDT</div>
+        </div>
+        <div class="card" style="background:#0b0d0f;padding:12px;">
+          <div class="label">Total Wallet</div>
+          <div class="value" id="totalWallet">0.000000 USDT</div>
+        </div>
+        <div class="card" style="background:#0b0d0f;padding:12px;margin-top:12px;">
+          <div class="label">Team Business</div>
+          <div class="value" id="teamBusiness">0.000000 USDT</div>
+        </div>
+      </div>
+    </div>
 
-        <!-- Team Section -->
-        <div class="card">
-          <h3>Your Team</h3>
-          <div class="flex-between small">
-            <div><b>Directs:</b> <span id="directCount">0</span></div>
-            <div><b>Active / Inactive:</b> <span id="activeCount">0 / 0</span></div>
-            <div><b>Team Business:</b> <span id="teamBusiness">0.000000 USDT</span></div>
-          </div>
-          <button id="showTeam" class="btn" style="margin-top:8px">Show Team</button>
-          <div class="history-box" style="margin-top:10px">
-            <table id="teamTable">
-              <thead><tr><th>Address</th><th>Stake</th><th>Status</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+    <div class="card">
+      <h2>Staking Info</h2>
+      <table>
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>Staked</td><td id="stakedDisplay">0.000000 USDT</td></tr>
+        <tr><td>Target (3x)</td><td id="targetDisplay">0.000000 USDT</td></tr>
+        <tr><td>Days to 3x</td><td id="days3x">0 days</td></tr>
+        <tr><td>Package Status</td><td id="pkgStatus">Inactive</td></tr>
+      </table>
+    </div>
 
-        <!-- Staking History -->
-        <div class="card">
-          <h3>Staking History</h3>
-          <div class="history-box">
-            <table id="stakedHistory">
-              <thead><tr><th>Date</th><th>User</th><th>From</th><th>Amount</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+    <div class="card">
+      <h2>Team & Levels</h2>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div style="flex:1"><div class="sm muted">Direct</div><div class="value" id="directCount">0</div></div>
+        <div style="flex:1"><div class="sm muted">Indirect</div><div class="value" id="indirectCount">0</div></div>
+        <div style="flex:2"><div class="sm muted">Active / Inactive</div><div class="value" id="activeCounts">0 / 0</div></div>
+      </div>
 
-        <!-- Withdrawal History -->
-        <div class="card">
-          <h3>Withdrawal History</h3>
-          <div class="history-box">
-            <table id="withdrawHistory">
-              <thead><tr><th>Date</th><th>User</th><th>Amount</th><th>Status</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+      <div style="margin-top:12px" class="card">
+        <h3 style="margin:6px 0 8px;color:var(--accent)">Direct Team</h3>
+        <table id="directTeamTable"><thead><tr><th>Wallet</th><th>Staked</th><th>Status</th></tr></thead>
+          <tbody id="directTeamBody"><tr><td colspan="3" class="center sm">No directs yet.</td></tr></tbody></table>
 
-        <!-- Disclaimer -->
-        <div class="card">
-          <h3>Disclaimer</h3>
-          <div class="small">
-            <b>Crypto Risk Notice:</b> All investments are at your own risk. By staking USDT, you agree you are fully responsible for your decisions.  
-            Admin may pause or update the contract for security reasons. Always DYOR before investing.
-          </div>
-        </div>
-      </div><!-- right panel -->
-    </div><!-- grid -->
-  </div><!-- wrap -->
+        <h3 style="margin:12px 0 8px;color:var(--accent)">Indirect Team</h3>
+        <table id="indirectTeamTable"><thead><tr><th>Wallet</th><th>Staked</th><th>Status</th></tr></thead>
+          <tbody id="indirectTeamBody"><tr><td colspan="3" class="center sm">No indirects yet.</td></tr></tbody></table>
+      </div>
+
+      <div style="margin-top:12px">
+        <table>
+          <thead><tr><th>Level</th><th>Percent</th><th>Status</th></tr></thead>
+          <tbody id="levelsTbody">
+            <tr><td>L1</td><td>10%</td><td id="sL1">Pending</td></tr>
+            <tr><td>L2</td><td>10%</td><td id="sL2">Pending</td></tr>
+            <tr><td>L3</td><td>5%</td><td id="sL3">Pending</td></tr>
+            <tr><td>L4</td><td>3%</td><td id="sL4">Pending</td></tr>
+            <tr><td>L5</td><td>2%</td><td id="sL5">Pending</td></tr>
+            <tr><td>L6</td><td>1%</td><td id="sL6">Pending</td></tr>
+            <tr><td>L7</td><td>1%</td><td id="sL7">Pending</td></tr>
+            <tr><td>L8</td><td>1%</td><td id="sL8">Pending</td></tr>
+            <tr><td>L9</td><td>1%</td><td id="sL9">Pending</td></tr>
+            <tr><td>L10</td><td>1%</td><td id="sL10">Pending</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Withdrawal History</h2>
+      <table id="withdrawHistoryTable">
+        <thead><tr><th>Req ID</th><th>Amount</th><th>Status</th><th>Time</th></tr></thead>
+        <tbody id="withdrawHistoryBody"><tr><td colspan="4" class="center sm">No withdrawals yet.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+</main>
+
+<footer>Made with ❤️ — Testnet only (do not use mainnet funds while testing)</footer>
 
 <script>
-  window.addEventListener("load", async () => {
-  if (window.ethereum) {
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const accounts = await provider.listAccounts();
-    if (accounts.length === 0) {
-      console.log("🟡 No wallet connected — requesting access");
-      try {
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-      } catch (e) {
-        console.warn("Auto connect rejected:", e);
+/* ==================== CONFIG ==================== */
+const STAKING_ADDRESS = "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f";
+const TOKEN_ADDRESS   = "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA";
+
+let TOKEN_DECIMALS = 6; // default
+let provider, signer, stakingContract, tokenContract, account = null;
+
+/* ==================== ABI (match the Solidity above) ==================== */
+/* If you recompile contract, paste the new ABI here */
+const STAKING_ABI = [
+  // (keep the ABI minimal for the functions we use)
+  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
+{"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"requestWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+
+  {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"address","name":"_owner","type":"address"},{"internalType":"uint256","name":"_minTxUnits","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"rewardUnits","type":"uint256"}],"name":"Claim","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Deposit","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"referrer","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"ReferralCredited","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"levelUser","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"level","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"LevelCredited","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnitsAfterFee","type":"uint256"}],"name":"WithdrawApproved","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"WithdrawRequested","type":"event"},
+  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getDirectRefs","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"pending","type":"uint256"},{"internalType":"uint256","name":"incomeBal","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"withdrawRequestsCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getWithdrawRequest","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint8","name":"status","type":"uint8"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"requestWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"_owner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"directCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"incomeBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"}
+];
+const TOKEN_ABI = [
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address,uint256) returns (bool)"
+];
+
+/* ==================== HELPERS ==================== */
+function toFixedNumber(num, decimals = 6) {
+  if (isNaN(num)) return "0.000000";
+  return Number(num).toFixed(decimals);
+}
+function fromUnits(valueBn) {
+  try { return Number(ethers.utils.formatUnits(valueBn, TOKEN_DECIMALS)); }
+  catch (e) { return Number(valueBn) / (10 ** TOKEN_DECIMALS); }
+}
+
+/* ==================== CONNECT WALLET ==================== */
+async function connect() {
+  try {
+    if (!window.ethereum) { alert("MetaMask not found. Install and refresh."); return; }
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    await provider.send("eth_requestAccounts", []);
+    signer = provider.getSigner();
+    account = await signer.getAddress();
+
+    document.getElementById("walletDisplay").innerText = `${account}`;
+    document.getElementById("connectBtn").innerText = "Connected ✅";
+
+    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+    tokenContract   = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+
+    try { TOKEN_DECIMALS = await tokenContract.decimals(); } catch (e) { TOKEN_DECIMALS = 6; }
+
+    // ✅ Robust referral link generator (works on GitHub pages, custom domain, localhost, all)
+const baseURL = window.location.href.split("?")[0]; 
+document.getElementById("referralInput").value = `${baseURL}?ref=${account}`;
+console.log("Referral link generated:", `${baseURL}?ref=${account}`);
+
+    // Attach event listeners (contract events)
+    listenEvents();
+
+    await refreshAll();
+  } catch (err) {
+    console.error("connect error", err);
+    alert("Connect failed: " + (err?.message || err));
+  }
+}
+document.getElementById("connectBtn").addEventListener("click", connect);
+
+/* Auto reconnect */
+window.addEventListener("load", async () => {
+  const prev = localStorage.getItem("staking_connected");
+  if (prev && window.ethereum) {
+    try {
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      const accs = await provider.listAccounts();
+      if (accs && accs.length > 0) {
+        signer = provider.getSigner();
+        account = accs[0];
+        stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+        tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+        document.getElementById("walletDisplay").innerText = account;
+        document.getElementById("connectBtn").innerText = "Connected ✅";
+        listenEvents();
+        document.getElementById("stakeBtn").addEventListener("click", stake);
+        document.getElementById("withdrawBtn").addEventListener("click", withdraw);
+        await refreshAll();
       }
-    } else {
-      console.log("✅ Auto connected wallet:", accounts[0]);
-      await connectWallet(true);
-    }
-  } else {
-    console.warn("⚠️ MetaMask not found");
+    } catch (e) { console.warn("Auto reconnect failed", e); }
   }
 });
 
-const CONFIG = {
-  tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
-  stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
-  decimals: 6,
-  chainId: 97 // BSC testnet
-};
-
-let provider, signer, userAddress, stakingContract, tokenContract;
-
-// 🟢 Initialize provider
-async function initProvider() {
-  if (!window.ethereum) {
-    alert("Please install MetaMask to continue!");
-    return;
+/* ==================== EVENT HELPERS (parse logs for instant & level incomes) ==================== */
+async function sumReferralEventsFor(accountAddr) {
+  if (!provider) return 0;
+  try {
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const filter = stakingContract.filters.ReferralCredited(accountAddr, null); // ✅ corrected
+    const logs = await provider.getLogs({
+      address: STAKING_ADDRESS,
+      fromBlock: 0,
+      toBlock: "latest",
+      topics: filter.topics,
+    });
+    let sumUnits = ethers.BigNumber.from(0);
+    for (const l of logs) {
+      const parsed = iface.parseLog(l);
+      const amountUnits = parsed.args.amountUnits;
+      sumUnits = sumUnits.add(amountUnits);
+    }
+    return fromUnits(sumUnits);
+  } catch (e) {
+    console.warn("sumReferralEventsFor failed, fallback to 0", e);
+    return 0;
   }
-  provider = new ethers.providers.Web3Provider(window.ethereum);
-  window.ethereum.on("accountsChanged", () => window.location.reload());
-  window.ethereum.on("chainChanged", () => window.location.reload());
 }
 
-// 🟢 Connect Wallet (manual + auto)
-async function connectWallet(auto = false) {
+async function sumLevelEventsFor(accountAddr) {
+  if (!provider) return 0;
   try {
-    if (!provider) await initProvider();
-    const accounts = await provider.listAccounts();
-    if (accounts.length === 0 && !auto) await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    userAddress = await signer.getAddress();
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const filter = stakingContract.filters.LevelCredited(accountAddr, null); // ✅ corrected
+    const logs = await provider.getLogs({
+      address: STAKING_ADDRESS,
+      fromBlock: 0,
+      toBlock: "latest",
+      topics: filter.topics,
+    });
+    let sumUnits = ethers.BigNumber.from(0);
+    for (const l of logs) {
+      const parsed = iface.parseLog(l);
+      const amountUnits = parsed.args.amountUnits;
+      sumUnits = sumUnits.add(amountUnits);
+    }
+    return fromUnits(sumUnits);
+  } catch (e) {
+    console.warn("sumLevelEventsFor failed, fallback to 0", e);
+    return 0;
+  }
+}
 
-    stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
-    tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
+/* ==================== REFRESH ALL (main) ==================== */
+async function refreshAll() {
+  if (!stakingContract || !account) return;
+  try {
+    // === WALLET BALANCE ===
+    const rawBal = await tokenContract.balanceOf(account);
+    const walletBal = fromUnits(rawBal);
+    document.getElementById("walletDisplay").innerText =
+      `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
 
-    document.getElementById("connectBtn").innerText = "Connected ✓";
-    document.getElementById("statusText").innerText = "Connected";
-    document.getElementById("addrDisplay").innerText = "Address: " + userAddress;
+    // === USER INFO ===
+    const info = await stakingContract.getUserInfo(account);
+    const staked = fromUnits(info.staked || 0);
+    const roiPending = fromUnits(info.pending || 0);
+    const incomeBal = fromUnits(info.incomeBal || 0);
+    const totalEarned = fromUnits(info.totalEarned || 0);
 
-    const refLink = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
-    document.getElementById("refLink").value = refLink;
+    // === DIRECTS ===
+    const directs = await stakingContract.getDirectRefs(account);
+    const directCount = directs.length;
+
+    // === TEAM BUSINESS + INDIRECTS ===
+    let teamBusiness = 0;
+    let indirectCount = 0;
+    for (const d of directs) {
+      const dInfo = await stakingContract.getUserInfo(d);
+      teamBusiness += fromUnits(dInfo.staked || 0);
+      const subs = await stakingContract.getDirectRefs(d);
+      indirectCount += subs.length;
+      for (const s of subs) {
+        const sInfo = await stakingContract.getUserInfo(s);
+        teamBusiness += fromUnits(sInfo.staked || 0);
+      }
+    }
+    document.getElementById("teamBusiness").innerText =
+      toFixedNumber(teamBusiness, 6) + " USDT";
+    document.getElementById("directCount").innerText = directCount;
+    document.getElementById("indirectCount").innerText = indirectCount;
+
+    // === ACTIVE / INACTIVE ===
+    let active = 0, inactive = 0;
+    for (const d of directs) {
+      const dInfo = await stakingContract.getUserInfo(d);
+      const st = fromUnits(dInfo.staked || 0);
+      if (st > 0) active++; else inactive++;
+    }
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
+    // === LEVEL UNLOCK LOGIC ===
+    const rows = document.querySelectorAll("#levelsTbody tr");
+    rows.forEach((r, i) => {
+      const cell = r.querySelector("td:last-child");
+      if (!cell) return;
+      if (i < Math.min(directCount, 10)) {
+        cell.innerText = "Open ✅";
+        cell.style.color = "#00FF90";
+        cell.style.fontWeight = "600";
+      } else {
+        cell.innerText = "Pending";
+        cell.style.color = "";
+        cell.style.fontWeight = "";
+      }
+    });
+
+    // === WITHDRAW DEDUCTIONS ===
+    let totalWithdrawed = 0;
+    try {
+      const countBn = await stakingContract.withdrawRequestsCount();
+      const count = Number(countBn || 0);
+      for (let i = 1; i <= count; i++) {
+        const req = await stakingContract.getWithdrawRequest(i);
+        if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
+          if (req.status === 0 || req.status === 1)
+            totalWithdrawed += fromUnits(req.amount || 0);
+        }
+      }
+    } catch (err) { console.warn("Withdraw check error", err); }
+
+// === INCOME SPLIT (FINAL FIXED) ===
+let instantIncome = 0;
+let levelIncome = 0;
+let totalWallet = 0;
+
+try {
+  // 🔹 Step 1: Calculate instant income (10% of all directs' total stake)
+  if (directs.length > 0) {
+    const directInfos = await Promise.all(
+      directs.map(d => stakingContract.getUserInfo(d).catch(() => null))
+    );
+    for (const info of directInfos) {
+      if (info) {
+        const st = fromUnits(info.staked || 0);
+        instantIncome += st * 0.10; // 10% of each direct's stake
+      }
+    }
+  }
+
+  // 🔹 Step 2: Level income = incomeBalance - instantIncome
+  levelIncome = incomeBal - instantIncome;
+  if (levelIncome < 0) levelIncome = 0;
+
+  // 🔹 Step 3: Total wallet = instant + level + ROI pending - all withdrawals
+  totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
+  if (totalWallet < 0) totalWallet = 0;
+
+  // 🔹 Step 4: Update UI (safe with fallback)
+  document.getElementById("instantIncome").innerText =
+    toFixedNumber(instantIncome, 6) + " USDT";
+
+  document.getElementById("levelIncome").innerText =
+    toFixedNumber(levelIncome, 6) + " USDT";
+
+  document.getElementById("roiPending").innerText =
+    toFixedNumber(roiPending, 6) + " USDT";
+
+  document.getElementById("totalWallet").innerText =
+    toFixedNumber(totalWallet, 6) + " USDT";
+
+  console.log("✅ Income Debug → Instant:", instantIncome.toFixed(3),
+              "Level:", levelIncome.toFixed(3),
+              "ROI:", roiPending.toFixed(3),
+              "Withdrawn:", totalWithdrawed.toFixed(3),
+              "TotalWallet:", totalWallet.toFixed(3));
+
+} catch (err) {
+  console.error("Income calc error:", err);
+}
+
+
+    // === STAKING INFO ===
+    const dailyRate = 0.01;
+    let daysTo3x = 0;
+    if (staked > 0) {
+      const dailyReward = staked * dailyRate;
+      const already = totalEarned + roiPending + incomeBal;
+      const remaining = Math.max(staked * 3 - already, 0);
+      daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
+    }
+    document.getElementById("stakedDisplay").innerText =
+      toFixedNumber(staked, 6) + " USDT";
+    document.getElementById("targetDisplay").innerText =
+      toFixedNumber(staked * 3, 6) + " USDT";
+    document.getElementById("days3x").innerText = daysTo3x + " days";
+    document.getElementById("pkgStatus").innerText =
+      staked > 0 ? "Active" : "Inactive";
+
+    // === HISTORY + TEAM TABLE ===
+    await loadWithdrawHistory();
+    await loadTeamInfo();
+
+    // === DEBUG LOG ===
+    console.log(
+      `✅ Refresh Done:
+Direct Business = ${directBusiness.toFixed(2)}
+Instant Income = ${instantIncome.toFixed(2)}
+Level Income = ${levelIncome.toFixed(2)}
+ROI Pending = ${roiPending.toFixed(2)}
+Withdrawn = ${totalWithdrawed.toFixed(2)}
+Total Wallet = ${totalWallet.toFixed(2)}`
+    );
+
+  } catch (err) {
+    console.error("refreshAll error:", err);
+  }
+}
+
+
+async function stake() {
+  try {
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
+    }
+
+    const amtStr = document.getElementById("stakeAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter stake amount");
+      return;
+    }
+
+    const amt = Number(amtStr);
+    if (amt < 20 || amt % 20 !== 0) {
+      alert("Stake must be at least 20 USDT and multiple of 20");
+      return;
+    }
+
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // ✅ STEP 1: Safely claim old ROI before staking
+    try {
+      const info = await stakingContract.getUserInfo(account);
+      const pendingROI = Number(ethers.utils.formatUnits(info.pending || 0, TOKEN_DECIMALS));
+      if (pendingROI > 0) {
+        console.log("⏳ Claiming old ROI before new stake...");
+        const txClaim = await stakingContract.claimRewards();
+        await txClaim.wait();
+        console.log("✅ Old ROI claimed successfully.");
+        await new Promise((r) => setTimeout(r, 1500)); // 1.5s delay to confirm timestamp
+      } else {
+        console.log("No pending ROI, skipping claim step.");
+      }
+    } catch (claimErr) {
+      console.warn("Claim skipped or failed (safe to ignore):", claimErr);
+    }
+
+    // ✅ STEP 2: Resolve referral
+    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
+    if (!ref || !ethers.utils.isAddress(ref)) {
+      try {
+        ref = await stakingContract.owner();
+      } catch {
+        ref = ethers.constants.AddressZero;
+      }
+    }
+
+    // ✅ STEP 3: Execute deposit (new stake)
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Processing...";
+    btn.disabled = true;
+
+    const tx = await stakingContract.deposit(units, ref);
+    console.log("🚀 New stake transaction sent...");
+    await tx.wait();
+
+    alert("✅ Stake successful — old ROI preserved!");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
 
     await refreshAll();
   } catch (e) {
-    console.error("Wallet connection failed:", e);
-    if (!auto) alert("Wallet connection failed. Check console.");
+    console.error("stake error", e);
+    alert("Stake failed: " + (e?.data?.message || e?.message || e));
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
   }
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  await initProvider();
-  document.getElementById('connectBtn').onclick = async () => {
-  console.log("🔗 Connect button clicked");
+
+async function claim() {
   try {
-    await connectWallet(false);
+    if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
+    const tx = await stakingContract.claimRewards();
+    alert("Claim transaction sent...");
+    await tx.wait();
+    alert("Claim processed");
+    await refreshAll();
+  } catch (e) {
+    console.error("claim error", e);
+    alert("Claim failed: " + (e?.data?.message || e?.message || e));
+  }
+}
+
+// withdraw
+document.getElementById("withdrawBtn").addEventListener("click", withdraw);
+async function withdraw() {
+  try {
+    if (!stakingContract || !signer) { alert("Connect wallet first!"); return; }
+    const amtStr = document.getElementById("withdrawAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) { alert("Enter withdraw amount"); return; }
+    const amt = Number(amtStr);
+    if (amt < 10 || amt % 10 !== 0) { alert("Minimum withdraw 10 USDT (multiples of 10)"); return; }
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // Optimistic UI: reduce total wallet immediately for better UX
+    try {
+      const totalWalletEl = document.getElementById("totalWallet");
+      const current = parseFloat(totalWalletEl.innerText.split(" ")[0]) || 0;
+      const newVal = Math.max(0, current - amt);
+      totalWalletEl.innerText = toFixedNumber(newVal, 6) + " USDT";
+      document.getElementById("withdrawStatus").innerText = "⏳ Sending withdraw request...";
+    } catch (e) { /* ignore UI fallback */ }
+
+    const tx = await stakingContract.requestWithdraw(units);
+    await tx.wait();
+    document.getElementById("withdrawStatus").innerText = "✅ Withdraw request submitted successfully!";
+    await refreshAll();
+  } catch (e) {
+    console.error("Withdraw error:", e);
+    alert("Withdraw failed: " + (e?.data?.message || e?.message || e));
+  }
+}
+
+/* ==================== QUICK APPROVE ==================== */
+document.getElementById("quickApproveBtn").addEventListener("click", async () => {
+  try {
+    if (!tokenContract || !signer) { alert("Connect wallet first"); return; }
+    const approveUnits = ethers.utils.parseUnits("1000000", TOKEN_DECIMALS);
+    const btn = document.getElementById("quickApproveBtn");
+    btn.innerText = "Approving...";
+    btn.disabled = true;
+    const tx = await tokenContract.approve(STAKING_ADDRESS, approveUnits);
+    await tx.wait();
+    btn.innerText = "Approved ✅";
+    setTimeout(() => { btn.innerText = "Quick Approve"; btn.disabled = false; }, 1500);
+    await refreshAll();
   } catch (err) {
-    console.error("❌ Manual connect failed:", err);
-    alert("Wallet connection failed, check console for details.");
+    console.error("Approve error:", err);
+    alert("Approve failed: " + (err?.data?.message || err?.message || err));
+    const btn = document.getElementById("quickApproveBtn");
+    btn.innerText = "Quick Approve";
+    btn.disabled = false;
   }
-};
-
-  try {
-    const acc = await provider.listAccounts();
-    if (acc.length > 0) await connectWallet(true);
-  } catch (e) {}
 });
-</script>
-<script>
-// 🧩 Helper functions
-function toUnits(v){ return ethers.utils.parseUnits(String(v), CONFIG.decimals); }
-function fromUnits(v){ return Number(ethers.utils.formatUnits(v, CONFIG.decimals)); }
 
-// 🧩 Approve token spending
-document.getElementById("approveBtn").onclick = async () => {
-  if (!tokenContract) return alert("Please connect wallet first.");
+/* ==================== EVENTS LISTENER (on-chain events -> refresh) ==================== */
+function listenEvents() {
   try {
-    const tx = await tokenContract.approve(CONFIG.stakingAddress, ethers.constants.MaxUint256);
-    await tx.wait();
-    alert("✅ Approved successfully!");
-  } catch(e){
-    console.error(e);
-    alert("Approve failed: " + (e.message || e));
+    if (!stakingContract) return;
+
+    stakingContract.removeAllListeners && stakingContract.removeAllListeners();
+
+    stakingContract.on("Deposit", (user, amount, referrer, event) => {
+      console.log("Deposit event", user, amount.toString(), referrer);
+      if (account && user.toLowerCase() === account.toLowerCase()) alert("✅ Deposit processed for you");
+      refreshAll();
+    });
+
+    stakingContract.on("ReferralCredited", (referrer, from, amountUnits, event) => {
+      console.log("ReferralCredited", referrer, from, amountUnits.toString());
+      if (account && referrer.toLowerCase() === account.toLowerCase()) {
+        alert("🔥 You got Instant Referral Income!");
+      }
+      refreshAll();
+    });
+
+    stakingContract.on("LevelCredited", (levelUser, from, level, amountUnits, event) => {
+      console.log("LevelCredited", levelUser, from, level.toString(), amountUnits.toString());
+      if (account && levelUser.toLowerCase() === account.toLowerCase()) {
+        alert(`🎉 Level ${level.toString()} Income Received`);
+      }
+      refreshAll();
+    });
+
+    stakingContract.on("WithdrawRequested", (id, user, amountUnits, event) => {
+      console.log("WithdrawRequested", id.toString(), user, amountUnits.toString());
+      if (account && user.toLowerCase() === account.toLowerCase()) {
+        alert("🕒 Withdraw Requested (awaiting approval)");
+      }
+      refreshAll();
+    });
+
+    stakingContract.on("WithdrawApproved", (id, user, amountUnitsAfterFee, event) => {
+      console.log("WithdrawApproved", id.toString(), user, amountUnitsAfterFee.toString());
+      if (account && user.toLowerCase() === account.toLowerCase()) {
+        alert("💸 Withdraw Approved (received funds after fee)");
+      }
+      refreshAll();
+    });
+
+    stakingContract.on("Claim", (user, rewardUnits, event) => {
+      console.log("Claim", user, rewardUnits.toString());
+      if (account && user.toLowerCase() === account.toLowerCase()) {
+        alert("✅ ROI Claimed & Credited internally");
+      }
+      refreshAll();
+    });
+
+  } catch (e) {
+    console.warn("listenEvents error", e);
   }
-};
-
-// 🧩 Stake for yourself
-document.getElementById("stakeBtn").onclick = async () => {
-  if (!stakingContract) return alert("Please connect wallet first.");
-  const amount = document.getElementById("stakeAmt").value;
-  if (!amount || Number(amount) < 20) return alert("Minimum stake: 20 USDT");
-
-  const amt = toUnits(amount);
-  const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
-
-  try {
-    const tx = await stakingContract.stake(amt, refParam);
-    await tx.wait();
-    alert("✅ Stake successful!");
-    refreshAll();
-  } catch(e){ alert("Stake failed: " + (e.message || e)); console.error(e); }
-};
-
-// 🧩 P2P Stake (without 5% fee)
-document.getElementById("stakeForBtn").onclick = async () => {
-  if (!stakingContract) return alert("Please connect wallet first.");
-  const amount = document.getElementById("stakeAmt").value;
-  const addr = document.getElementById("stakeForAddr").value;
-  if (!addr) return alert("Enter recipient wallet address.");
-  if (!amount || Number(amount) < 20) return alert("Minimum stake: 20 USDT");
-
-  const amt = toUnits(amount);
-  const owner = await stakingContract.owner();
-  try {
-    const tx = await stakingContract.stakeFor(addr, amt, owner);
-    await tx.wait();
-    alert("✅ P2P stake done successfully!");
-    refreshAll();
-  } catch(e){ alert("StakeFor failed: " + (e.message || e)); console.error(e); }
-};
-
-// 🧩 Request withdrawal
-document.getElementById("requestWithdraw").onclick = async () => {
-  if (!stakingContract) return alert("Please connect wallet.");
-  const amount = document.getElementById("withdrawAmt").value;
-  if (!amount || Number(amount) < 20) return alert("Minimum withdraw: 20 USDT");
-
-  try {
-    const tx = await stakingContract.requestWithdrawal(toUnits(amount));
-    await tx.wait();
-    alert("✅ Withdrawal requested successfully!");
-    loadWithdrawHistory();
-  } catch(e){ alert("Withdraw failed: " + (e.message || e)); console.error(e); }
-};
-
-// 🧩 Refresh button
-document.getElementById("refreshBtn").onclick = async () => {
-  await refreshAll();
-};
-
-// 🧩 Copy referral link
-document.getElementById("copyLink").onclick = () => {
-  const val = document.getElementById("refLink").value;
-  navigator.clipboard.writeText(val);
-  alert("Referral link copied!");
-};
-
-// 🧩 Load team data
-document.getElementById("showTeam").onclick = async () => {
-  await loadTeamData();
-};
-
-// 🧩 Refresh withdrawals
-document.getElementById("refreshWithdrawals").onclick = async () => {
-  await loadWithdrawHistory();
-};
-
-// =========================== MAIN REFRESH FUNCTION =============================
-async function refreshAll() {
-  if (!stakingContract || !tokenContract) return;
-  try {
-    const bal = await tokenContract.balanceOf(userAddress);
-    document.getElementById("balanceDisplay").innerText = "USDT Balance: " + fromUnits(bal).toFixed(6);
-
-    // ROI + incomes
-    const userInfo = await stakingContract.users(userAddress);
-    const staked = fromUnits(userInfo.totalStake);
-    const roiIncome = fromUnits(userInfo.roiIncome);
-    const instIncome = fromUnits(userInfo.instantIncome);
-    const lvlIncome = fromUnits(userInfo.levelIncome);
-    const totalEarn = fromUnits(userInfo.totalEarned);
-    const withdrawable = fromUnits(await stakingContract.getWithdrawable(userAddress));
-    const daysLeft = await stakingContract.getTimeTo3x(userAddress);
-
-    document.getElementById("instantIncome").innerText = instIncome.toFixed(6);
-    document.getElementById("levelIncome").innerText = lvlIncome.toFixed(6);
-    document.getElementById("roiIncome").innerText = roiIncome.toFixed(6);
-    document.getElementById("totalWallet").innerText = withdrawable.toFixed(6);
-    document.getElementById("days3x").innerText = Number(daysLeft);
-  } catch(e){ console.error("Refresh error:", e); }
-
-  await loadTeamData();
-  await loadStakedHistory();
-  await loadWithdrawHistory();
-  await updateLevelStatus();
 }
 
-// =========================== TEAM & LEVEL FUNCTIONS =============================
-async function loadTeamData(){
-  const tableBody = document.querySelector("#teamTable tbody");
-  tableBody.innerHTML = "";
-  let active = 0, inactive = 0, business = 0;
-
+/* ==================== WITHDRAW HISTORY (table) ==================== */
+async function loadWithdrawHistory() {
+  if (!stakingContract || !account) return;
   try {
-    const directs = await stakingContract.getDirects(userAddress);
-    document.getElementById("directCount").innerText = directs.length;
+    const countBn = await stakingContract.withdrawRequestsCount();
+    const count = Number(countBn || 0);
+    const tbody = document.getElementById("withdrawHistoryBody");
+    tbody.innerHTML = "";
 
-    for (const addr of directs){
-      const u = await stakingContract.users(addr);
-      const stake = fromUnits(u.totalStake);
-      const status = u.isActive ? "Active" : "Inactive";
-      business += stake;
-      if (u.isActive) active++; else inactive++;
-
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${addr}</td><td>${stake.toFixed(2)} USDT</td><td>${status}</td>`;
-      tableBody.appendChild(row);
+    // Show latest first
+    for (let i = count; i >= 1 && i > count - 200; i--) {
+      const req = await stakingContract.getWithdrawRequest(i);
+      if (!req || !req.user) continue;
+      if (req.user && req.user.toLowerCase() !== account.toLowerCase()) continue;
+      const amt = fromUnits(req.amount || 0);
+      const status = (req.status === 0) ? "Pending" : (req.status === 1) ? "Approved" : "Rejected";
+      const time = new Date(Number(req.timestamp || 0) * 1000).toLocaleString();
+      const row = `<tr><td>#${i}</td><td>${toFixedNumber(amt,6)}</td><td>${status}</td><td>${time}</td></tr>`;
+      tbody.innerHTML += row;
     }
 
-    document.getElementById("activeCount").innerText = `${active} / ${inactive}`;
-    document.getElementById("teamBusiness").innerText = business.toFixed(6) + " USDT";
-  } catch(e){ console.error(e); }
+    if (!tbody.innerHTML) tbody.innerHTML = '<tr><td colspan="4" class="center sm">No withdrawals yet.</td></tr>';
+  } catch (e) { console.warn("loadWithdrawHistory error", e); }
 }
 
-// 🧩 Update level open/pending status
-async function updateLevelStatus(){
+/* ==================== TEAM TABLES ==================== */
+async function loadTeamInfo() {
+  if (!stakingContract || !account) return;
   try {
-    const directs = await stakingContract.getDirects(userAddress);
-    const count = directs.length;
-    for (let i=1; i<=10; i++){
-      const s = document.getElementById("sL"+i);
-      if (!s) continue;
-      if (count >= i){
-        s.className = "badge badge-open";
-        s.innerText = "OPEN";
-      } else {
-        s.className = "badge badge-pending";
-        s.innerText = "PENDING";
+    // Directs
+    const directs = await stakingContract.getDirectRefs(account);
+    const directBody = document.getElementById("directTeamBody");
+    directBody.innerHTML = "";
+    if (!directs || directs.length === 0) {
+      directBody.innerHTML = '<tr><td colspan="3" class="center sm">No directs yet.</td></tr>';
+    } else {
+      const infos = await Promise.all(directs.map(a => stakingContract.getUserInfo(a).catch(() => null)));
+      for (let i = 0; i < directs.length; i++) {
+        const addr = directs[i];
+        if (!ethers.utils.isAddress(addr)) continue;
+        const info = infos[i];
+        const st = info ? fromUnits(info.staked || 0) : 0;
+        const status = st > 0 ? "Active" : "Inactive";
+        directBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st, 2)} USDT</td><td>${status}</td></tr>`;
       }
     }
-  } catch(e){ console.error(e); }
-}
-</script>
-<script>
-// ======= Ensure stakingIface helper =======
-let stakingIface;
-function ensureIface() {
-  if (!stakingIface) {
-    try {
-      stakingIface = new ethers.utils.Interface(STAKING_ABI);
-    } catch (e) {
-      console.error("Failed to create staking interface", e);
-    }
-  }
-}
 
-// ======= Load Staked History (Staked event) =======
-async function loadStakedHistory() {
-  try {
-    if (!provider) return;
-    ensureIface();
-    const tbody = document.querySelector("#stakedHistory tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-
-    const topic = stakingIface.getEventTopic("Staked");
-    const logs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topic] });
-    // reverse for latest first
-    const latest = logs.slice().reverse().slice(0, 100);
-    for (const l of latest) {
-      const parsed = stakingIface.parseLog(l);
-      const blk = await provider.getBlock(l.blockNumber);
-      const when = new Date(blk.timestamp * 1000).toLocaleString();
-      const user = parsed.args.user || parsed.args[0];
-      const from = parsed.args.from || parsed.args[1];
-      const amount = fromUnits(parsed.args.amount);
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${when}</td><td>${user}</td><td>${from}</td><td>${amount.toFixed(6)} USDT</td>`;
-      tbody.appendChild(tr);
-    }
-  } catch (e) {
-    console.error("loadStakedHistory err", e);
-  }
-}
-
-// ======= Load Withdraw History (Requested + Approved) =======
-async function loadWithdrawHistory() {
-  try {
-    if (!provider) return;
-    ensureIface();
-    const tbody = document.querySelector("#withdrawHistory tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-
-    const topicReq = stakingIface.getEventTopic("WithdrawalRequested");
-    const topicApv = stakingIface.getEventTopic("WithdrawalApproved");
-
-    const reqLogs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topicReq] });
-    const apvLogs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topicApv] });
-
-    const apvById = {};
-    for (const l of apvLogs) {
-      const ev = stakingIface.parseLog(l);
-      apvById[ev.args.id.toString()] = ev.args;
+    // Indirects (one level deep)
+    const indirects = [];
+    if (directs && directs.length > 0) {
+      const subsArrays = await Promise.all(directs.map(d => stakingContract.getDirectRefs(d).catch(() => [])));
+      for (const arr of subsArrays) if (arr && arr.length) indirects.push(...arr);
     }
 
-    const sorted = reqLogs.slice().reverse().slice(0, 100);
-    for (const l of sorted) {
-      const ev = stakingIface.parseLog(l);
-      const blk = await provider.getBlock(l.blockNumber);
-      const when = new Date(blk.timestamp * 1000).toLocaleString();
-      const user = ev.args.user;
-      const amt = fromUnits(ev.args.amount);
-      const id = ev.args.id.toString();
-      const approved = apvById[id] ? true : false;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${when}</td><td>${user}</td><td>${amt.toFixed(6)} USDT</td><td>${approved ? 'Yes' : 'Pending'}</td>`;
-      tbody.appendChild(tr);
-    }
-  } catch (e) {
-    console.error("loadWithdrawHistory err", e);
-  }
-}
-
-// ======= Load Level Earnings for current user (LevelCommissionPaid events) =======
-async function loadLevelEarnings() {
-  try {
-    if (!provider || !userAddress) return;
-    ensureIface();
-    const topic = stakingIface.getEventTopic("LevelCommissionPaid");
-    // topics: [topic, from, to] and to is indexed param (index 2)
-    const toTopic = ethers.utils.hexZeroPad(userAddress, 32);
-    const logs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topic, null, toTopic] });
-
-    const perLevel = new Array(10).fill(0);
-    for (const l of logs) {
-      const ev = stakingIface.parseLog(l);
-      const level = Number(ev.args.level) - 1;
-      const amt = fromUnits(ev.args.amount);
-      if (level >= 0 && level < 10) perLevel[level] += amt;
+    const indirectBody = document.getElementById("indirectTeamBody");
+    indirectBody.innerHTML = "";
+    if (!indirects || indirects.length === 0) {
+      indirectBody.innerHTML = '<tr><td colspan="3" class="center sm">No indirects yet.</td></tr>';
+    } else {
+      const infos = await Promise.all(indirects.map(a => stakingContract.getUserInfo(a).catch(() => null)));
+      for (let i = 0; i < indirects.length; i++) {
+        const addr = indirects[i];
+        if (!ethers.utils.isAddress(addr)) continue;
+        const info = infos[i];
+        const st = info ? fromUnits(info.staked || 0) : 0;
+        const status = st > 0 ? "Active" : "Inactive";
+        indirectBody.innerHTML += `<tr><td class="sm">${addr}</td><td>${toFixedNumber(st, 2)} USDT</td><td>${status}</td></tr>`;
+      }
     }
 
-    for (let i = 0; i < 10; i++) {
-      const el = document.getElementById("eL" + (i + 1));
-      if (el) el.innerText = perLevel[i].toFixed(6);
-    }
+    // update counts
+    document.getElementById("directCount").innerText = directs.length.toString();
+    document.getElementById("indirectCount").innerText = indirects.length.toString();
 
-    // also update levelIncome from contract state (fallback)
-    try {
-      const u = await stakingContract.users(userAddress);
-      document.getElementById("levelIncome").innerText = fromUnits(u.levelIncome).toFixed(6);
-    } catch (e) { /* ignore */ }
+    let active = 0, inactive = 0;
+    if (directs.length > 0) {
+      const infos = await Promise.all(directs.map(a => stakingContract.getUserInfo(a).catch(()=>null)));
+      for (const info of infos) {
+        const st = info ? fromUnits(info.staked || 0) : 0;
+        if (st > 0) active++; else inactive++;
+      }
+    }
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
   } catch (e) {
-    console.error("loadLevelEarnings err", e);
+    console.error("loadTeamInfo error", e);
   }
 }
 
-// ======= Small helpers: to/from units (already used earlier) =======
-// (If those were defined earlier they will be reused; this is a safe duplicate)
-function toUnits(v) { return ethers.utils.parseUnits(String(v), CONFIG.decimals); }
-function fromUnits(v) { try { return Number(ethers.utils.formatUnits(v, CONFIG.decimals)); } catch (e) { return 0; } }
+/* ==================== UI ACTIONS & Utilities ==================== */
+document.getElementById("copyRefBtn").addEventListener("click", async () => {
+  if (!account) { alert("Connect wallet first"); return; }
+  await navigator.clipboard.writeText(document.getElementById("referralInput").value);
+  alert("Referral link copied!");
+});
 
-// ======= Final ABIs (paste your full ABIs here if different) =======
-// If you already added STAKING_ABI and TOKEN_ABI earlier in the file, these lines are ignored/redundant.
-// But to be safe for paste, we re-declare them only if not present.
-if (typeof STAKING_ABI === "undefined") {
-  const STAKING_ABI = [
-    {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"emergencyWithdrawAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"contract IERC20","name":"_token","type":"address"},{"internalType":"address","name":"_adminWallet","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
-    {"inputs":[],"name":"EnforcedPause","type":"error"},
-    {"inputs":[],"name":"ExpectedPause","type":"error"},
-    {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},
-    {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},
-    {"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAdmin","type":"address"}],"name":"AdminWalletUpdated","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"EmergencyWithdraw","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"InstantCommissionPaid","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint8","name":"level","type":"uint8"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"LevelCommissionPaid","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},
-    {"inputs":[],"name":"pauseContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},
-    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"pauseUser","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"ref","type":"address"}],"name":"register","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Registered","type":"event"},
-    {"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"amt","type":"uint256"}],"name":"requestWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"RoiAccrued","type":"event"},
-    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"setAdminWallet","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"bps","type":"uint256"}],"name":"setDailyRoi","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"bps","type":"uint256"}],"name":"setWithdrawFee","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"ref","type":"address"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Staked","type":"event"},
-    {"inputs":[{"internalType":"address","name":"refUser","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"refForRefUser","type":"address"}],"name":"stakeFor","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[],"name":"unpauseContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},
-    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"unpauseUser","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"}],"name":"UserPaused","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"}],"name":"UserUnpaused","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"gross","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"net","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"fee","type":"uint256"}],"name":"WithdrawalApproved","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"WithdrawalRequested","type":"event"},
-    {"stateMutability":"payable","type":"receive"},
-    {"inputs":[],"name":"adminWallet","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"BPS_DIV","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"dailyROIbps","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"usr","type":"address"}],"name":"getTimeTo3x","outputs":[{"internalType":"uint256","name":"daysLeft","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"usr","type":"address"}],"name":"getWithdrawable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"usr","type":"address"}],"name":"getDirects","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"levelPercents","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"MAX_LEVELS","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"maxRewardMultiplier","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"minStake","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"nextWithdrawId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"registered","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"totalFeesCollected","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"totalUsers","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"totalWithdrawnNet","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalStake","type":"uint256"},{"internalType":"uint256","name":"totalWithdrawn","type":"uint256"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"lastRoiUpdate","type":"uint256"},{"internalType":"uint256","name":"roiIncome","type":"uint256"},{"internalType":"uint256","name":"instantIncome","type":"uint256"},{"internalType":"uint256","name":"levelIncome","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"},{"internalType":"bool","name":"isPaused","type":"bool"},{"internalType":"uint256","name":"inactiveAt","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"withdrawals","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"approved","type":"bool"},{"internalType":"uint256","name":"timestamp","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"withdrawFeeBps","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
-  ];
-}
+document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 
-if (typeof TOKEN_ABI === "undefined") {
-  const TOKEN_ABI = [
-    {"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},
-    {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"oldOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},
-    {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},
-    {"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"address","name":"owner_","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
-    {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
-  ];
-}
-
-// ======= Auto-refresh small interval (keeps UI near-live) =======
-setInterval(() => {
-  if (typeof refreshAll === "function") {
-    try { refreshAll(); } catch (e) { /* ignore */ }
-  }
-}, 30 * 1000); // every 30s
-
-// ======= Ensure initial load of histories after connect (safe) =======
-async function loadHistories() {
-  try {
-    await loadStakedHistory();
-    await loadWithdrawHistory();
-    await loadLevelEarnings();
-  } catch (e) { console.error(e); }
-}
-
-// If user is already connected on page load, initial functions will run via connectWallet(true) called earlier.
+/* END */
+console.log("Dashboard script loaded. Connect wallet to begin.");
 </script>
 </body>
 </html>
+
