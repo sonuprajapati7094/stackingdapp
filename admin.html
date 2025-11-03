@@ -1,443 +1,142 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
   <meta charset="utf-8" />
+  <title>USDT Staking — Admin</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Panel — USDT Staking (Pro)</title>
-
-  <!-- ethers v5 -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  <!-- bootstrap for quick layout -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
   <style>
-    :root{
-      --bg:#0b0d0f; --card:#121416; --muted:#9aa4b2; --accent:#ffd86b; --panel:#0f1113;
-      --gold: #ffd86b;
-    }
-    body { background:var(--bg); color:#e6eef6; font-family: Inter, Arial, sans-serif; padding:26px; }
-    header { text-align:center; margin-bottom:18px; }
-    h1 { color:var(--gold); margin:0 0 6px 0; font-weight:700; }
-    .sub { color:var(--muted); margin-bottom:18px; }
-    .card { background:var(--card); border:0; color:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.5); }
-    .stat { padding:14px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent); }
-    .kpi { font-weight:700; font-size:18px; color:#fff; }
-    .kpi-sub { color:var(--muted); font-size:12px; }
-    .btn-accent { background:var(--gold); color:#000; border:0; font-weight:700; }
-    table th { color:var(--gold); border-bottom:1px solid rgba(255,255,255,0.03); }
-    table td { vertical-align:middle; }
-    .muted { color:var(--muted); }
-    .small { font-size:13px; color:var(--muted); }
-    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .topline { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-    .gold-text { color:var(--gold); font-weight:700; }
-    .badge-pend { background:orange; color:#000; }
-    .badge-appr { background:#00ff9a; color:#000; }
-    .badge-rej { background:#ff6b6b; color:#000; }
-    @media(max-width:900px){ .topline { flex-direction:column; align-items:flex-start; } }
+    body{background:#071014;color:#fff;font-family:Inter,Arial;padding:20px}
+    .wrap{max-width:1000px;margin:0 auto}
+    .card{background:#0e1416;padding:16px;border-radius:10px;margin-bottom:12px}
+    .btn{background:#f6c84c;color:#000;padding:8px 12px;border:none;border-radius:8px;cursor:pointer}
+    input{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:#fff}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)}
   </style>
 </head>
 <body>
-  <header>
-    <h1>USDT Staking — Admin Panel (Pro)</h1>
-    <div class="sub">Owner only — Approve withdrawals, emergency withdraw, view logs & export CSV</div>
-  </header>
+<div class="wrap">
+  <h2>Admin Panel — USDT Staking</h2>
+  <div class="card">
+    <div><b>Connected as:</b> <span id="addr"></span></div>
+    <div style="margin-top:10px"><button id="connect" class="btn">Connect MetaMask</button></div>
+  </div>
 
-  <div class="topline">
-    <div style="display:flex; gap:12px; align-items:center;">
-      <button id="connectBtn" class="btn btn-accent">Connect Wallet</button>
-      <div id="ownerInfo" class="small muted">Not connected</div>
+  <div class="card">
+    <h3>Withdraw Approval</h3>
+    <div class="row" style="display:flex;gap:8px">
+      <input id="wid" placeholder="Withdrawal ID"/>
+      <button id="approveWid" class="btn">Approve Withdrawal</button>
     </div>
+    <div id="approveResult" style="margin-top:8px;color:#ddd"></div>
+  </div>
 
-    <div class="controls">
-      <div id="autoRefreshWrap" class="small muted">Auto-refresh:
-        <label style="margin-left:8px;">
-          <input id="autoRefresh" type="checkbox" checked/> 10s
-        </label>
-      </div>
-      <button id="refreshBtn" class="btn btn-outline-light btn-sm">Refresh Now</button>
-      <button id="exportBtn" class="btn btn-outline-light btn-sm">Export CSV</button>
+  <div class="card">
+    <h3>Pause / Unpause User</h3>
+    <div style="display:flex;gap:8px">
+      <input id="pauseAddr" placeholder="user address"/>
+      <button id="pauseBtn" class="btn">Pause</button>
+      <button id="unpauseBtn" class="btn">Unpause</button>
     </div>
   </div>
 
-  <div class="row g-3 mb-3">
-    <div class="col-md-3">
-      <div class="card stat p-3">
-        <div class="kpi" id="totalReq">—</div>
-        <div class="kpi-sub">Total Requests</div>
-      </div>
+  <div class="card">
+    <h3>Set ROI / Fee</h3>
+    <div style="display:flex;gap:8px">
+      <input id="roiBps" placeholder="dailyROI bps (100 = 1%)"/>
+      <input id="feeBps" placeholder="withdraw fee bps (500 = 5%)"/>
+      <button id="setParams" class="btn">Set</button>
     </div>
-    <div class="col-md-3">
-      <div class="card stat p-3">
-        <div class="kpi" id="pendingReq">—</div>
-        <div class="kpi-sub">Pending</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card stat p-3">
-        <div class="kpi" id="approvedReq">—</div>
-        <div class="kpi-sub">Approved</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card stat p-3">
-        <div class="kpi" id="rejectedReq">—</div>
-        <div class="kpi-sub">Rejected</div>
-      </div>
-    </div>
+    <div id="setResult" style="margin-top:8px;color:#ddd"></div>
   </div>
 
-  <div class="row g-3 mb-3">
-    <div class="col-lg-8">
-      <div class="card p-3">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h5 class="gold-text" style="margin:0">Withdrawal Requests</h5>
-            <div class="small muted">Approve or reject user withdrawal requests</div>
-          </div>
-          <div>
-            <span class="small muted">Contract USDT: </span><span id="contractBalance" class="gold-text">—</span>
-          </div>
-        </div>
-
-        <div style="overflow:auto; margin-top:14px;">
-          <table class="table table-dark table-striped">
-            <thead><tr>
-              <th style="width:60px">ID</th>
-              <th>User</th>
-              <th style="width:150px">Amount (USDT)</th>
-              <th style="width:120px">Status</th>
-              <th style="width:220px">Time</th>
-              <th style="width:220px">Action</th>
-            </tr></thead>
-            <tbody id="withdrawTable">
-              <tr><td colspan="6" class="text-center muted">Connect as owner and refresh to see requests</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+  <div class="card">
+    <h3>Emergency</h3>
+    <div style="display:flex;gap:8px">
+      <input id="emTo" placeholder="to address"/>
+      <button id="emBtn" class="btn">Emergency Withdraw All</button>
     </div>
-
-    <div class="col-lg-4">
-      <div class="card p-3">
-        <h5 class="gold-text" style="margin:0">Emergency Withdraw</h5>
-        <div class="small muted" style="margin-bottom:8px">Send tokens from contract to any address (owner only)</div>
-
-        <div class="mb-2">
-          <input id="toAddr" type="text" class="form-control" placeholder="Recipient address" />
-        </div>
-        <div class="mb-2">
-          <input id="amount" type="number" class="form-control" placeholder="Amount (USDT)" />
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button id="emergencyBtn" class="btn btn-danger w-100">Emergency Withdraw</button>
-          <button id="balanceBtn" class="btn btn-outline-light">Refresh Balance</button>
-        </div>
-
-        <hr style="border-color:rgba(255,255,255,0.03)"/>
-
-        <div class="small muted">Owner Address:</div>
-        <div id="ownerAddr" class="small gold-text" style="word-break:break-all">—</div>
-      </div>
-    </div>
+    <div id="emRes" style="margin-top:8px;color:#ddd"></div>
   </div>
-
-  <footer style="margin-top:18px" class="small muted">Pro Admin Panel — Use cautiously on mainnet. All actions require owner signature.</footer>
+</div>
 
 <script>
-/* ================= CONFIG ================= */
-const CONTRACT_ADDRESS = "0xbE98B8e2c1F062d16A0f9fE5d9e5628eD510BB57"; // <-- REPLACE
-const TOKEN_DECIMALS = 6; // USDT decimals
-const AUTO_REFRESH_INTERVAL = 10000; // 10s
+const CONFIG = {
+  tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
+  stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
+  decimals: 6
+};
 
-/* Minimal ABI subset needed */
 const STAKING_ABI = [
-  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"rejectWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdrawToken","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"withdrawRequestsCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getWithdrawRequest","outputs":[
-    {"internalType":"address","name":"user","type":"address"},
-    {"internalType":"uint256","name":"amount","type":"uint256"},
-    {"internalType":"uint256","name":"timestamp","type":"uint256"},
-    {"internalType":"uint8","name":"status","type":"uint8"}],
-    "stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"}
+  "function owner() external view returns (address)",
+  "function approveWithdrawal(uint256 id) external",
+  "function pauseUser(address userAddr) external",
+  "function unpauseUser(address userAddr) external",
+  "function setDailyRoi(uint256 bps) external",
+  "function setWithdrawFee(uint256 bps) external",
+  "function emergencyWithdrawAll(address to) external"
 ];
 
-/* ERC20 minimal ABI */
-const ERC20_ABI = [
-  "function decimals() view returns (uint8)",
-  "function balanceOf(address) view returns (uint256)",
-  "function symbol() view returns (string)"
-];
+let provider, signer, addr, staking;
 
-/* ================= STATE ================= */
-let provider, signer, stakingContract, erc20Contract;
-let connectedAccount = null, ownerAddress = null;
-let autoRefreshTimer = null;
-let lastWithdrawList = []; // cache for CSV export
-
-/* ================= HELPERS ================= */
-function log(msg){ console.log("[admin]", msg); }
-function toFixed(n, d=6){ return Number(n).toFixed(d); }
-function fromUnits(bn, decimals=TOKEN_DECIMALS){ try { return Number(ethers.utils.formatUnits(bn, decimals)); } catch(e){ return Number(bn) / (10 ** decimals); } }
-function toUnits(num, decimals=TOKEN_DECIMALS){ return ethers.utils.parseUnits(String(num), decimals); }
-function formatTime(ts){ return new Date(Number(ts) * 1000).toLocaleString(); }
-
-/* ================= UI ELEMENTS ================= */
-const connectBtn = document.getElementById("connectBtn");
-const refreshBtn = document.getElementById("refreshBtn");
-const exportBtn = document.getElementById("exportBtn");
-const emergencyBtn = document.getElementById("emergencyBtn");
-const balanceBtn = document.getElementById("balanceBtn");
-const autoRefreshCheckbox = document.getElementById("autoRefresh");
-
-connectBtn.addEventListener("click", connectWallet);
-refreshBtn.addEventListener("click", refreshAll);
-exportBtn.addEventListener("click", exportCSV);
-emergencyBtn.addEventListener("click", emergencyWithdraw);
-balanceBtn.addEventListener("click", fetchContractBalance);
-
-/* ================= CONNECT ================= */
-async function connectWallet(){
-  try {
-    if (!window.ethereum) throw new Error("MetaMask not found");
-    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-    await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    connectedAccount = await signer.getAddress();
-
-    stakingContract = new ethers.Contract(CONTRACT_ADDRESS, STAKING_ABI, signer);
-    ownerAddress = await stakingContract.owner();
-    document.getElementById("ownerInfo").innerText = `Connected: ${connectedAccount}`;
-
-    if (connectedAccount.toLowerCase() !== ownerAddress.toLowerCase()){
-      document.getElementById("ownerInfo").innerText = `Connected (${connectedAccount}) — NOT owner`;
-      alert("Connected account is not contract owner. Switch to owner to access admin features.");
-      return;
-    }
-
-    // Show owner address
-    document.getElementById("ownerAddr").innerText = ownerAddress;
-    connectBtn.classList.add("d-none");
-    document.getElementById("ownerInfo").innerText = `Connected as owner: ${connectedAccount}`;
-
-    // prepare token contract (read-only)
-    const tokenAddr = await stakingContract.token();
-    try {
-      erc20Contract = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
-    } catch(e){ erc20Contract = null; }
-
-    // initial load
-    await refreshAll();
-
-    // start auto-refresh if checkbox checked
-    if (autoRefreshCheckbox.checked) startAutoRefresh();
-  } catch (err) {
-    console.error(err);
-    alert("Connect failed: " + (err.message || err));
+document.getElementById('connect').onclick = async () => {
+  if (!window.ethereum) return alert("Install MetaMask");
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = provider.getSigner();
+  addr = await signer.getAddress();
+  document.getElementById('addr').innerText = addr;
+  staking = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
+  // verify owner
+  const owner = await staking.owner();
+  if (owner.toLowerCase() !== addr.toLowerCase()) {
+    alert("Warning: Connected account is not owner. Admin actions will fail.");
   }
-}
+};
 
-/* ================= AUTO REFRESH ================= */
-function startAutoRefresh(){
-  stopAutoRefresh();
-  autoRefreshTimer = setInterval(()=>{ refreshAll().catch(()=>{}); }, AUTO_REFRESH_INTERVAL);
-}
-function stopAutoRefresh(){ if (autoRefreshTimer) clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-autoRefreshCheckbox.addEventListener("change", ()=> {
-  if (autoRefreshCheckbox.checked) startAutoRefresh(); else stopAutoRefresh();
-});
-
-/* ================= REFRESH ALL ================= */
-async function refreshAll(){
-  if (!stakingContract) return;
+document.getElementById('approveWid').onclick = async () => {
+  const id = document.getElementById('wid').value;
+  if (!id) return alert("Enter id");
   try {
-    // 1) Withdraw requests
-    const countBn = await stakingContract.withdrawRequestsCount();
-    const count = Number(countBn || 0);
-    document.getElementById("totalReq").innerText = count;
-
-    const tbody = document.getElementById("withdrawTable");
-    tbody.innerHTML = "";
-
-    // counters
-    let pending=0, approved=0, rejected=0;
-    const rows = [];
-
-    for (let i = 1; i <= count; i++){
-      try {
-        const req = await stakingContract.getWithdrawRequest(i);
-        const statusNum = Number(req.status);
-        const statusLabel = statusNum === 0 ? "Pending" : (statusNum === 1 ? "Approved" : "Rejected");
-        if (statusNum === 0) pending++;
-        else if (statusNum === 1) approved++;
-        else rejected++;
-
-        const amt = fromUnits(req.amount, TOKEN_DECIMALS);
-        const time = formatTime(req.timestamp);
-
-        // push row data for table & CSV
-        rows.push({
-          id: i,
-          user: req.user,
-          amount: amt,
-          status: statusLabel,
-          statusNum,
-          timestamp: Number(req.timestamp)
-        });
-
-      } catch(e){
-        console.warn("getWithdrawRequest error for id", i, e);
-      }
-    }
-
-    // populate table (reverse chronological visually)
-    if (rows.length === 0){
-      tbody.innerHTML = "<tr><td colspan='6' class='text-center muted'>No withdraw requests</td></tr>";
-    } else {
-      // sort by id desc
-      rows.sort((a,b)=>b.id - a.id);
-      for (const r of rows){
-        const badgeClass = r.statusNum === 0 ? "badge-pend" : (r.statusNum === 1 ? "badge-appr" : "badge-rej");
-        const actionHtml = r.statusNum === 0
-          ? `<button class="btn btn-sm btn-success me-1" onclick="approve(${r.id})">Approve</button>
-             <button class="btn btn-sm btn-danger" onclick="reject(${r.id})">Reject</button>`
-          : `<span class="small muted">—</span>`;
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>#${r.id}</td>
-          <td style="word-break:break-all">${r.user}</td>
-          <td>${toFixed(r.amount,6)}</td>
-          <td><span class="badge ${badgeClass}">${r.status}</span></td>
-          <td>${new Date(r.timestamp*1000).toLocaleString()}</td>
-          <td>${actionHtml}</td>
-        `;
-        tbody.appendChild(tr);
-      }
-    }
-
-    // update stats
-    document.getElementById("pendingReq").innerText = pending;
-    document.getElementById("approvedReq").innerText = approved;
-    document.getElementById("rejectedReq").innerText = rejected;
-
-    // store last withdraw list for CSV export
-    lastWithdrawList = rows;
-
-    // 2) contract token balance (if token known)
-    await fetchContractBalance();
-
-  } catch (err) {
-    console.error("refreshAll error", err);
-    alert("Failed to refresh data. See console.");
-  }
-}
-
-/* ================= FETCH CONTRACT BALANCE ================= */
-async function fetchContractBalance(){
-  try {
-    if (!stakingContract) return;
-    const tokenAddr = await stakingContract.token();
-    if (!tokenAddr || tokenAddr === ethers.constants.AddressZero){
-      document.getElementById("contractBalance").innerText = "—";
-      return;
-    }
-    // use provider (read-only)
-    const token = new ethers.Contract(tokenAddr, ERC20_ABI, provider || ethers.getDefaultProvider());
-    const decimals = (await token.decimals().catch(()=>TOKEN_DECIMALS)) || TOKEN_DECIMALS;
-    const bnBal = await token.balanceOf(CONTRACT_ADDRESS);
-    const bal = fromUnits(bnBal, decimals);
-    document.getElementById("contractBalance").innerText = toFixed(bal,6) + " USDT";
-  } catch (err){
-    console.warn("fetchContractBalance", err);
-    document.getElementById("contractBalance").innerText = "error";
-  }
-}
-
-/* ============== ACTIONS ============== */
-async function approve(id){
-  try {
-    if (!stakingContract) throw new Error("Not connected");
-    const tx = await stakingContract.approveWithdrawal(id);
+    const tx = await staking.approveWithdrawal(Number(id));
     await tx.wait();
-    alert("Approved #" + id);
-    refreshAll();
-  } catch (err){
-    console.error(err);
-    alert("Approve failed: " + (err.data?.message || err.message || err));
-  }
-}
-async function reject(id){
+    document.getElementById('approveResult').innerText = "Approved id " + id;
+  } catch(e){ console.error(e); alert("Approve failed: " + (e?.message || e)); }
+};
+
+document.getElementById('pauseBtn').onclick = async () => {
+  const a = document.getElementById('pauseAddr').value;
+  if (!a) return alert("addr");
+  try { const tx = await staking.pauseUser(a); await tx.wait(); alert("Paused"); } catch(e){ alert(e?.message||e) }
+};
+document.getElementById('unpauseBtn').onclick = async () => {
+  const a = document.getElementById('pauseAddr').value;
+  if (!a) return alert("addr");
+  try { const tx = await staking.unpauseUser(a); await tx.wait(); alert("Unpaused"); } catch(e){ alert(e?.message||e) }
+};
+
+document.getElementById('setParams').onclick = async () => {
+  const r = document.getElementById('roiBps').value;
+  const f = document.getElementById('feeBps').value;
+  if (!r && !f) return alert("Enter params");
   try {
-    if (!stakingContract) throw new Error("Not connected");
-    const tx = await stakingContract.rejectWithdrawal(id);
-    await tx.wait();
-    alert("Rejected #" + id);
-    refreshAll();
-  } catch (err){
-    console.error(err);
-    alert("Reject failed: " + (err.data?.message || err.message || err));
-  }
-}
-async function emergencyWithdraw(){
+    if (r) { const tx = await staking.setDailyRoi(Number(r)); await tx.wait(); }
+    if (f) { const tx2 = await staking.setWithdrawFee(Number(f)); await tx2.wait(); }
+    document.getElementById('setResult').innerText = "Params updated";
+  } catch(e){ alert("Failed: " + (e?.message||e)) }
+};
+
+document.getElementById('emBtn').onclick = async () => {
+  const to = document.getElementById('emTo').value;
+  if (!to) return alert("to address");
   try {
-    if (!stakingContract) throw new Error("Not connected");
-    const to = document.getElementById("toAddr").value.trim();
-    const amount = document.getElementById("amount").value;
-    if (!ethers.utils.isAddress(to)) return alert("Invalid recipient address");
-    if (!amount || Number(amount) <= 0) return alert("Enter valid amount");
-
-    const units = toUnits(amount, TOKEN_DECIMALS);
-    if (!confirm(`Send ${amount} USDT from contract to ${to}?`)) return;
-
-    const tx = await stakingContract.emergencyWithdrawToken(to, units);
+    const tx = await staking.emergencyWithdrawAll(to);
     await tx.wait();
-    alert("Emergency withdraw executed.");
-    refreshAll();
-  } catch (err){
-    console.error(err);
-    alert("Emergency withdraw failed: " + (err.data?.message || err.message || err));
-  }
-}
+    document.getElementById('emRes').innerText = "Emergency withdraw executed";
+  } catch(e){ alert("Failed: " + (e?.message||e)) }
+};
 
-/* ============== CSV EXPORT ============== */
-function exportCSV(){
-  if (!lastWithdrawList || lastWithdrawList.length === 0) return alert("No data to export");
-  const rows = lastWithdrawList.slice().sort((a,b)=>a.id - b.id); // ascending ids
-  const header = ["ID","User","Amount","Status","Timestamp"];
-  const csv = [header.join(",")];
-  for (const r of rows){
-    const line = [r.id, `"${r.user}"`, r.amount, r.status, new Date(r.timestamp*1000).toLocaleString()];
-    csv.push(line.join(","));
-  }
-  const csvStr = csv.join("\n");
-  const blob = new Blob([csvStr], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `withdraw_requests_${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/* ============== INIT ============== */
-window.addEventListener("load", ()=> {
-  // show small hint if CONTRACT_ADDRESS not set
-  if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === "PASTE_YOUR_STAKING_CONTRACT_ADDRESS"){
-    alert("Please replace CONTRACT_ADDRESS constant in the admin_pro.html with your deployed staking contract address.");
-    document.getElementById("ownerInfo").innerText = "Set CONTRACT_ADDRESS in the file";
-  } else {
-    document.getElementById("ownerInfo").innerText = "Ready — Connect wallet (must be owner)";
-  }
-
-  // auto refresh toggle default handled above
-});
 </script>
-
 </body>
 </html>
-
