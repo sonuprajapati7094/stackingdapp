@@ -391,36 +391,34 @@ async function initProvider() {
 
 async function connect() {
   try {
+    console.log("STEP 1: Initializing provider...");
     if (!provider) await initProvider();
 
-    // request wallet access
+    console.log("STEP 2: Requesting accounts...");
     await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    userAddress = await signer.getAddress();
 
-    // update UI
+    console.log("STEP 3: Getting signer...");
+    signer = provider.getSigner();
+
+    console.log("STEP 4: Getting address...");
+    userAddress = await signer.getAddress();
+    console.log("Connected address:", userAddress);
+
     document.getElementById('connectBtn').innerText = "Connected ✓";
     document.getElementById('statusText').innerText = "Connected";
     document.getElementById('addrDisplay').innerText = `Address: ${userAddress}`;
 
-    // initialize contracts
+    console.log("STEP 5: Creating contracts...");
     stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
     tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
     stakingInterface = new ethers.utils.Interface(STAKING_ABI);
+    console.log("Contracts initialized");
 
-    // show referral link
-    const refLinkInput = document.getElementById('refLink');
-    refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
-
-    // load dashboard
+    console.log("STEP 6: Refreshing dashboard...");
     await refreshAll();
-    drawLevelBoxes();
-    initChart();
-    await loadLevelEarnings();
-    await loadEventHistories();
 
   } catch (err) {
-    console.error("Wallet connect failed:", err);
+    console.error("Connect error details:", err);
     alert("Wallet connection failed. Please try again.");
   }
 }
