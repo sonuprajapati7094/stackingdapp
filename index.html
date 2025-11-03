@@ -366,84 +366,70 @@ const TOKEN_ABI = [
   ],"stateMutability":"view","type":"function"}
 ];
 
-let provider, signer, userAddress;
-let stakingContract, tokenContract, stakingInterface;
+let provider, signer, userAddress, stakingContract, tokenContract;
 
 async function initProvider() {
-  if (!window.ethereum) {
+  if (typeof window.ethereum === "undefined") {
     alert("MetaMask not detected! Please install MetaMask extension.");
     return;
   }
 
-  // create provider (with "any" ensures reactivity on network change)
+  // Initialize ethers provider with 'any' network
   provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-  const network = await provider.getNetwork();
 
-  // check if BSC Testnet
-  if (network.chainId !== 97) {
-    alert("Please switch MetaMask network to Binance Smart Chain Testnet!");
-  }
-
-  // listen to account / network change
-  window.ethereum.on('accountsChanged', () => window.location.reload());
-  window.ethereum.on('chainChanged', () => window.location.reload());
+  // Auto reload when account or network changes
+  window.ethereum.on("accountsChanged", () => window.location.reload());
+  window.ethereum.on("chainChanged", () => window.location.reload());
 }
 
-async function connect() {
+async function connectWallet(auto = false) {
   try {
-    console.log("STEP 1: Initializing provider...");
     if (!provider) await initProvider();
 
-    console.log("STEP 2: Requesting accounts...");
-    await provider.send("eth_requestAccounts", []);
+    const accounts = await provider.listAccounts();
 
-    console.log("STEP 3: Getting signer...");
+    if (accounts.length === 0 && !auto) {
+      // ask permission only if not auto
+      await provider.send("eth_requestAccounts", []);
+    }
+
     signer = provider.getSigner();
-
-    console.log("STEP 4: Getting address...");
     userAddress = await signer.getAddress();
-    console.log("Connected address:", userAddress);
 
-    document.getElementById('connectBtn').innerText = "Connected ✓";
-    document.getElementById('statusText').innerText = "Connected";
-    document.getElementById('addrDisplay').innerText = `Address: ${userAddress}`;
+    // show connected status
+    document.getElementById("connectBtn").innerText = "Connected ✓";
+    document.getElementById("statusText").innerText = "Connected";
+    document.getElementById("addrDisplay").innerText = `Address: ${userAddress}`;
 
-    console.log("STEP 5: Creating contracts...");
+    // initialize contracts
     stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
     tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
-    stakingInterface = new ethers.utils.Interface(STAKING_ABI);
-    console.log("Contracts initialized");
 
-    console.log("STEP 6: Refreshing dashboard...");
+    // set referral link
+    const refLinkInput = document.getElementById("refLink");
+    if (refLinkInput)
+      refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
+
+    console.log("Wallet connected:", userAddress);
     await refreshAll();
 
   } catch (err) {
-    console.error("Connect error details:", err);
-    alert("Wallet connection failed. Please try again.");
+    console.error("Connection error:", err);
+    if (!auto) alert("Wallet connection failed. Please try again.");
   }
 }
 
-// ✅ Auto-connect logic (runs on page load)
-window.addEventListener('load', async () => {
+// ✅ Auto run when page loads
+window.addEventListener("load", async () => {
   await initProvider();
 
-  try {
-    const accounts = await provider.listAccounts();
-    if (accounts.length > 0) {
-      console.log("Auto-connecting existing wallet:", accounts[0]);
-      await connect();
-    } else {
-      document.getElementById('statusText').innerText = "Please connect wallet.";
-    }
-  } catch (err) {
-    console.warn("Auto connect skipped:", err);
-  }
+  // try auto connect (no popup)
+  await connectWallet(true);
 
-  // also attach manual button click
-  const btn = document.getElementById('connectBtn');
-  if (btn) btn.addEventListener('click', connect);
+  // also allow manual button connect
+  const btn = document.getElementById("connectBtn");
+  if (btn) btn.addEventListener("click", () => connectWallet(false));
 });
-
 
 // approve large allowance
 document.getElementById('approveBtn').onclick = async () => {
