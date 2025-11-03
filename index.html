@@ -176,32 +176,188 @@ let provider, signer, stakingContract, tokenContract, account = null;
 
 /* ==================== ABI (match the Solidity above) ==================== */
 /* If you recompile contract, paste the new ABI here */
- const STAKING_ABI = [
-  // (keep the ABI minimal for the functions we use)
-  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
-{"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"requestWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
+ // ====================== STAKING_ABI ======================
+const STAKING_ABI = [
+  // 🟢 Custom additions (stake & stakeFor)
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "address", "name": "ref", "type": "address" }
+    ],
+    "name": "stake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "refUser", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "address", "name": "refForRefUser", "type": "address" }
+    ],
+    "name": "stakeFor",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
 
-  {"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"address","name":"_owner","type":"address"},{"internalType":"uint256","name":"_minTxUnits","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"rewardUnits","type":"uint256"}],"name":"Claim","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Deposit","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"referrer","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"ReferralCredited","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"levelUser","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"level","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"LevelCredited","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnitsAfterFee","type":"uint256"}],"name":"WithdrawApproved","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"WithdrawRequested","type":"event"},
-  {"inputs":[{"internalType":"uint256","name":"reqId","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getDirectRefs","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"staked","type":"uint256"},{"internalType":"uint256","name":"lastAction","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"},{"internalType":"uint256","name":"totalEarned","type":"uint256"},{"internalType":"uint256","name":"pending","type":"uint256"},{"internalType":"uint256","name":"incomeBal","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"userAddr","type":"address"}],"name":"pendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"},{"internalType":"address","name":"referrer","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"withdrawRequestsCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getWithdrawRequest","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint8","name":"status","type":"uint8"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"amountUnits","type":"uint256"}],"name":"requestWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"_owner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"directCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"incomeBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"}
+  // 🧩 Full Contract ABI (as provided)
+  {
+    "inputs": [
+      { "internalType": "contract IERC20", "name": "_token", "type": "address" },
+      { "internalType": "address", "name": "_adminWallet", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  { "inputs": [], "name": "EnforcedPause", "type": "error" },
+  { "inputs": [], "name": "ExpectedPause", "type": "error" },
+  { "inputs": [{ "internalType": "address", "name": "owner", "type": "address" }], "name": "OwnableInvalidOwner", "type": "error" },
+  { "inputs": [{ "internalType": "address", "name": "account", "type": "address" }], "name": "OwnableUnauthorizedAccount", "type": "error" },
+  { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }], "name": "SafeERC20FailedOperation", "type": "error" },
+  {
+    "anonymous": false,
+    "inputs": [{ "indexed": true, "internalType": "address", "name": "newAdmin", "type": "address" }],
+    "name": "AdminWalletUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "EmergencyWithdraw",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "InstantCommissionPaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+      { "indexed": false, "internalType": "uint8", "name": "level", "type": "uint8" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "LevelCommissionPaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  { "anonymous": false, "inputs": [{ "indexed": false, "internalType": "address", "name": "account", "type": "address" }], "name": "Paused", "type": "event" },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "referrer", "type": "address" }
+    ],
+    "name": "Registered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "RoiAccrued",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "Staked",
+    "type": "event"
+  },
+  { "anonymous": false, "inputs": [{ "indexed": false, "internalType": "address", "name": "account", "type": "address" }], "name": "Unpaused", "type": "event" },
+  {
+    "anonymous": false,
+    "inputs": [{ "indexed": true, "internalType": "address", "name": "user", "type": "address" }],
+    "name": "UserPaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [{ "indexed": true, "internalType": "address", "name": "user", "type": "address" }],
+    "name": "UserUnpaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "gross", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "net", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "fee", "type": "uint256" }
+    ],
+    "name": "WithdrawalApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "WithdrawalRequested",
+    "type": "event"
+  },
+  { "inputs": [], "name": "BPS_DIV", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "MAX_LEVELS", "outputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "adminWallet", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }], "name": "approveWithdrawal", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "dailyROIbps", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "to", "type": "address" }], "name": "emergencyWithdrawAll", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "usr", "type": "address" }], "name": "getTimeTo3x", "outputs": [{ "internalType": "uint256", "name": "daysLeft", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "usr", "type": "address" }], "name": "getWithdrawable", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "name": "levelPercents", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "maxRewardMultiplier", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "minStake", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "nextWithdrawId", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "owner", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "pauseContract", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "a", "type": "address" }], "name": "pauseUser", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "paused", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "ref", "type": "address" }], "name": "register", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "", "type": "address" }], "name": "registered", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "renounceOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "amt", "type": "uint256" }], "name": "requestWithdrawal", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "a", "type": "address" }], "name": "setAdminWallet", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "bps", "type": "uint256" }], "name": "setDailyRoi", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "uint256", "name": "bps", "type": "uint256" }], "name": "setWithdrawFee", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "token", "outputs": [{ "internalType": "contract IERC20", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "totalFeesCollected", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "totalStaked", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "totalUsers", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "totalWithdrawnNet", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "newOwner", "type": "address" }], "name": "transferOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "unpauseContract", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "a", "type": "address" }], "name": "unpauseUser", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "withdrawFeeBps", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }
 ];
+
 const TOKEN_ABI = [
   "function decimals() view returns (uint8)",
   "function balanceOf(address) view returns (uint256)",
@@ -491,73 +647,35 @@ Total Wallet = ${totalWallet.toFixed(2)}`
 
 
 async function stake() {
+  if (!stakingContract || !tokenContract) return alert("Please connect wallet first.");
+
+  const amount = document.getElementById("stakeAmt").value;
+  if (!amount || Number(amount) < 20) return alert("Minimum stake: 20 USDT");
+
+  const amt = ethers.utils.parseUnits(String(amount), CONFIG.decimals);
+  const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
+
   try {
-    if (!stakingContract || !signer) {
-      alert("Connect wallet first");
-      return;
+    // Check if user is registered
+    const isRegistered = await stakingContract.registered(account);
+    if (!isRegistered) {
+      console.log("⚙️ User not registered, registering now...");
+      const ref = refParam === ethers.constants.AddressZero ? await stakingContract.owner() : refParam;
+      const regTx = await stakingContract.register(ref);
+      await regTx.wait();
+      console.log("✅ User registered successfully!");
     }
 
-    const amtStr = document.getElementById("stakeAmount").value;
-    if (!amtStr || Number(amtStr) <= 0) {
-      alert("Enter stake amount");
-      return;
-    }
+    // Proceed to stake
+    console.log("🚀 Proceeding to stake...");
+    const stakeTx = await stakingContract.stake(amt, refParam);
+    await stakeTx.wait();
 
-    const amt = Number(amtStr);
-    if (amt < 20 || amt % 20 !== 0) {
-      alert("Stake must be at least 20 USDT and multiple of 20");
-      return;
-    }
-
-    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-
-    // ✅ STEP 1: Safely claim old ROI before staking
-    try {
-      const info = await stakingContract.getUserInfo(account);
-      const pendingROI = Number(ethers.utils.formatUnits(info.pending || 0, TOKEN_DECIMALS));
-      if (pendingROI > 0) {
-        console.log("⏳ Claiming old ROI before new stake...");
-        const txClaim = await stakingContract.claimRewards();
-        await txClaim.wait();
-        console.log("✅ Old ROI claimed successfully.");
-        await new Promise((r) => setTimeout(r, 1500)); // 1.5s delay to confirm timestamp
-      } else {
-        console.log("No pending ROI, skipping claim step.");
-      }
-    } catch (claimErr) {
-      console.warn("Claim skipped or failed (safe to ignore):", claimErr);
-    }
-
-    // ✅ STEP 2: Resolve referral
-    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
-    if (!ref || !ethers.utils.isAddress(ref)) {
-      try {
-        ref = await stakingContract.owner();
-      } catch {
-        ref = ethers.constants.AddressZero;
-      }
-    }
-
-    // ✅ STEP 3: Execute deposit (new stake)
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Processing...";
-    btn.disabled = true;
-
-    const tx = await stakingContract.deposit(units, ref);
-    console.log("🚀 New stake transaction sent...");
-    await tx.wait();
-
-    alert("✅ Stake successful — old ROI preserved!");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
-
+    alert("✅ Stake successful!");
     await refreshAll();
-  } catch (e) {
-    console.error("stake error", e);
-    alert("Stake failed: " + (e?.data?.message || e?.message || e));
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
+  } catch (err) {
+    console.error("❌ Stake failed:", err);
+    alert("Stake failed: " + (err.message || err));
   }
 }
 
