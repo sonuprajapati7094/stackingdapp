@@ -647,35 +647,73 @@ Total Wallet = ${totalWallet.toFixed(2)}`
 
 
 async function stake() {
-  if (!stakingContract || !tokenContract) return alert("Please connect wallet first.");
-
-  const amount = document.getElementById("stakeAmt").value;
-  if (!amount || Number(amount) < 20) return alert("Minimum stake: 20 USDT");
-
-  const amt = ethers.utils.parseUnits(String(amount), CONFIG.decimals);
-  const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
-
   try {
-    // Check if user is registered
-    const isRegistered = await stakingContract.registered(account);
-    if (!isRegistered) {
-      console.log("⚙️ User not registered, registering now...");
-      const ref = refParam === ethers.constants.AddressZero ? await stakingContract.owner() : refParam;
-      const regTx = await stakingContract.register(ref);
-      await regTx.wait();
-      console.log("✅ User registered successfully!");
+    if (!stakingContract || !signer) {
+      alert("Connect wallet first");
+      return;
     }
 
-    // Proceed to stake
-    console.log("🚀 Proceeding to stake...");
-    const stakeTx = await stakingContract.stake(amt, refParam);
-    await stakeTx.wait();
+    const amtStr = document.getElementById("stakeAmount").value;
+    if (!amtStr || Number(amtStr) <= 0) {
+      alert("Enter stake amount");
+      return;
+    }
 
-    alert("✅ Stake successful!");
+    const amt = Number(amtStr);
+    if (amt < 20 || amt % 20 !== 0) {
+      alert("Stake must be at least 20 USDT and multiple of 20");
+      return;
+    }
+
+    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
+
+    // ✅ STEP 1: Safely claim old ROI before staking
+    try {
+      const info = await stakingContract.getUserInfo(account);
+      const pendingROI = Number(ethers.utils.formatUnits(info.pending || 0, TOKEN_DECIMALS));
+      if (pendingROI > 0) {
+        console.log("⏳ Claiming old ROI before new stake...");
+        const txClaim = await stakingContract.claimRewards();
+        await txClaim.wait();
+        console.log("✅ Old ROI claimed successfully.");
+        await new Promise((r) => setTimeout(r, 1500)); // 1.5s delay to confirm timestamp
+      } else {
+        console.log("No pending ROI, skipping claim step.");
+      }
+    } catch (claimErr) {
+      console.warn("Claim skipped or failed (safe to ignore):", claimErr);
+    }
+
+    // ✅ STEP 2: Resolve referral
+    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
+    if (!ref || !ethers.utils.isAddress(ref)) {
+      try {
+        ref = await stakingContract.owner();
+      } catch {
+        ref = ethers.constants.AddressZero;
+      }
+    }
+
+    // ✅ STEP 3: Execute deposit (new stake)
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Processing...";
+    btn.disabled = true;
+
+    const tx = await stakingContract.deposit(units, ref);
+    console.log("🚀 New stake transaction sent...");
+    await tx.wait();
+
+    alert("✅ Stake successful — old ROI preserved!");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
+
     await refreshAll();
-  } catch (err) {
-    console.error("❌ Stake failed:", err);
-    alert("Stake failed: " + (err.message || err));
+  } catch (e) {
+    console.error("stake error", e);
+    alert("Stake failed: " + (e?.data?.message || e?.message || e));
+    const btn = document.getElementById("stakeBtn");
+    btn.innerText = "Stake Now";
+    btn.disabled = false;
   }
 }
 
