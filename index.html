@@ -272,7 +272,16 @@ async function connectWallet(auto = false) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initProvider();
-  document.getElementById("connectBtn").onclick = () => connectWallet(false);
+  document.getElementById('connectBtn').onclick = async () => {
+  console.log("🔗 Connect button clicked");
+  try {
+    await connectWallet(false);
+  } catch (err) {
+    console.error("❌ Manual connect failed:", err);
+    alert("Wallet connection failed, check console for details.");
+  }
+};
+
   try {
     const acc = await provider.listAccounts();
     if (acc.length > 0) await connectWallet(true);
