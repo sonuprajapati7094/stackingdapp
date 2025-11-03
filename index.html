@@ -55,6 +55,15 @@ Index.html Github Old code<!DOCTYPE html>
       <div class="sm" style="margin-top:10px;">Tip: Approve once (Quick Approve) then stake.</div>
     </div>
 
+  <div style="margin-top:10px;">
+        <input id="p2pAddress" type="text" placeholder="Stake for wallet address" />
+        <button class="accent-btn" id="p2pStakeBtn">Stake For (P2P)</button>
+        <div class="muted" style="margin-top:5px;">Stake for other wallet (no 5% fee)</div>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">Tip: Approve once, then stake.</div>
+    </div>
+
     <div class="card">
       <h2>Your Referral Link</h2>
       <input id="referralInput" type="text" readonly />
@@ -163,6 +172,19 @@ Index.html Github Old code<!DOCTYPE html>
 
   </div>
 </main>
+
+   <!-- 🟡 NEW: Disclaimer Card -->
+    <div class="card" style="background:#101214;color:#ccc;">
+      <h2 style="color:#ffd86b;">Disclaimer</h2>
+      <div style="font-size:13px;line-height:1.6;">
+        This platform operates on the <b>Binance Smart Chain Testnet</b>.  
+        All actions here are for testing and educational purposes only.  
+        <span style="color:#ffd86b;">Do not use real USDT or mainnet funds</span>.  
+        Developers are not responsible for any loss of funds during testing.
+      </div>
+    </div>
+
+  </div>
 
 <footer>Made with ❤️ — Testnet only (do not use mainnet funds while testing)</footer>
 
@@ -717,6 +739,38 @@ async function stake() {
   }
 }
 
+// 🟢 P2P Stake Function
+document.getElementById("p2pStakeBtn").addEventListener("click", async () => {
+  try {
+    if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
+    const addr = document.getElementById("p2pAddress").value.trim();
+    const amtStr = document.getElementById("stakeAmount").value;
+    if (!ethers.utils.isAddress(addr)) { alert("Enter valid wallet address"); return; }
+    if (!amtStr || Number(amtStr) < 20) { alert("Minimum stake 20 USDT"); return; }
+
+    const amtUnits = ethers.utils.parseUnits(amtStr.toString(), TOKEN_DECIMALS);
+    const ownerAddr = await stakingContract.owner();
+
+    const btn = document.getElementById("p2pStakeBtn");
+    btn.innerText = "Processing...";
+    btn.disabled = true;
+
+    const tx = await stakingContract.stakeFor(addr, amtUnits, ownerAddr);
+    await tx.wait();
+
+    alert("✅ P2P Stake successful!");
+    btn.innerText = "Stake For (P2P)";
+    btn.disabled = false;
+
+    await refreshAll();
+  } catch (e) {
+    console.error("P2P Stake error:", e);
+    alert("StakeFor failed: " + (e?.data?.message || e?.message || e));
+    const btn = document.getElementById("p2pStakeBtn");
+    btn.innerText = "Stake For (P2P)";
+    btn.disabled = false;
+  }
+});
 
 async function claim() {
   try {
