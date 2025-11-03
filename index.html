@@ -219,30 +219,151 @@ const CONFIG = {
 
 // ABI (only functions & events we need)
 const STAKING_ABI = [
-  "function register(address referrer) external",
-  "function stake(uint256 amount, address referrer) external",
-  "function stakeFor(address refUser, uint256 amount, address refForRefUser) external",
-  "function updateRewards(address userAddr) external",
-  "function getUserInfo(address userAddr) external view returns (uint256 totalStake,uint256 roiIncome,uint256 instantIncome,uint256 levelIncome,uint256 totalEarned,uint256 totalWithdrawn_,bool isActive,uint256 directsCount)",
-  "function getWithdrawable(address userAddr) external view returns (uint256)",
-  "function getTimeTo3x(address userAddr) external view returns (uint256)",
-  "function getDirects(address userAddr) external view returns (address[])",
-  "function requestWithdrawal(uint256 amount) external",
-  "function owner() external view returns (address)",
-  "event Registered(address indexed user, address indexed referrer)",
-  "event Staked(address indexed user, address indexed from, uint256 amount)",
-  "event InstantCommissionPaid(address indexed from, address indexed to, uint256 amount)",
-  "event LevelCommissionPaid(address indexed from, address indexed to, uint8 level, uint256 amount)",
-  "event RoiAccrued(address indexed user, uint256 amount)",
-  "event WithdrawalRequested(address indexed user, uint256 id, uint256 amount)",
-  "event WithdrawalApproved(address indexed user, uint256 id, uint256 gross, uint256 net, uint256 fee)"
+  {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"approveWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"emergencyWithdrawAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"contract IERC20","name":"_token","type":"address"},{"internalType":"address","name":"_adminWallet","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
+  {"inputs":[],"name":"EnforcedPause","type":"error"},
+  {"inputs":[],"name":"ExpectedPause","type":"error"},
+  {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},
+  {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},
+  {"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAdmin","type":"address"}],"name":"AdminWalletUpdated","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"EmergencyWithdraw","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"InstantCommissionPaid","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint8","name":"level","type":"uint8"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"LevelCommissionPaid","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},
+  {"inputs":[],"name":"pauseContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},
+  {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"pauseUser","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"ref","type":"address"}],"name":"register","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Registered","type":"event"},
+  {"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amt","type":"uint256"}],"name":"requestWithdrawal","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"RoiAccrued","type":"event"},
+  {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"setAdminWallet","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"bps","type":"uint256"}],"name":"setDailyRoi","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"bps","type":"uint256"}],"name":"setWithdrawFee","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"ref","type":"address"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Staked","type":"event"},
+  {"inputs":[{"internalType":"address","name":"refUser","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"refForRefUser","type":"address"}],"name":"stakeFor","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"unpauseContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},
+  {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"unpauseUser","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"}],"name":"UserPaused","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"}],"name":"UserUnpaused","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"gross","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"net","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"fee","type":"uint256"}],"name":"WithdrawalApproved","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"WithdrawalRequested","type":"event"},
+  {"stateMutability":"payable","type":"receive"},
+  {"inputs":[],"name":"adminWallet","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"BPS_DIV","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"dailyROIbps","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"usr","type":"address"}],"name":"getTimeTo3x","outputs":[{"internalType":"uint256","name":"daysLeft","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"usr","type":"address"}],"name":"getWithdrawable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"levelPercents","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"MAX_LEVELS","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"maxRewardMultiplier","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"minStake","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"nextWithdrawId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"registered","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalFeesCollected","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalUsers","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalWithdrawnNet","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[
+    {"internalType":"address","name":"referrer","type":"address"},
+    {"internalType":"uint256","name":"totalStake","type":"uint256"},
+    {"internalType":"uint256","name":"totalWithdrawn","type":"uint256"},
+    {"internalType":"uint256","name":"totalEarned","type":"uint256"},
+    {"internalType":"uint256","name":"lastRoiUpdate","type":"uint256"},
+    {"internalType":"uint256","name":"roiIncome","type":"uint256"},
+    {"internalType":"uint256","name":"instantIncome","type":"uint256"},
+    {"internalType":"uint256","name":"levelIncome","type":"uint256"},
+    {"internalType":"bool","name":"isActive","type":"bool"},
+    {"internalType":"bool","name":"isPaused","type":"bool"},
+    {"internalType":"uint256","name":"inactiveAt","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"withdrawals","outputs":[
+    {"internalType":"address","name":"user","type":"address"},
+    {"internalType":"uint256","name":"amount","type":"uint256"},
+    {"internalType":"bool","name":"approved","type":"bool"},
+    {"internalType":"uint256","name":"timestamp","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"withdrawFeeBps","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
 ];
 
 const TOKEN_ABI = [
-  "function approve(address spender,uint256 amount) external returns(bool)",
-  "function allowance(address owner,address spender) external view returns(uint256)",
-  "function balanceOf(address owner) external view returns(uint256)",
-  "function decimals() external view returns(uint8)"
+  {"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+  {"anonymous":false,"inputs":[
+    {"indexed":true,"internalType":"address","name":"owner","type":"address"},
+    {"indexed":true,"internalType":"address","name":"spender","type":"address"},
+    {"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}
+  ],"name":"Approval","type":"event"},
+  {"inputs":[
+    {"internalType":"address","name":"spender","type":"address"},
+    {"internalType":"uint256","name":"amount","type":"uint256"}
+  ],"name":"approve","outputs":[
+    {"internalType":"bool","name":"","type":"bool"}
+  ],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[
+    {"internalType":"uint256","name":"amount","type":"uint256"}
+  ],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[
+    {"internalType":"address","name":"to","type":"address"},
+    {"internalType":"uint256","name":"amount","type":"uint256"}
+  ],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[
+    {"indexed":true,"internalType":"address","name":"oldOwner","type":"address"},
+    {"indexed":true,"internalType":"address","name":"newOwner","type":"address"}
+  ],"name":"OwnershipTransferred","type":"event"},
+  {"inputs":[
+    {"internalType":"address","name":"to","type":"address"},
+    {"internalType":"uint256","name":"amount","type":"uint256"}
+  ],"name":"transfer","outputs":[
+    {"internalType":"bool","name":"","type":"bool"}
+  ],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[
+    {"indexed":true,"internalType":"address","name":"from","type":"address"},
+    {"indexed":true,"internalType":"address","name":"to","type":"address"},
+    {"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}
+  ],"name":"Transfer","type":"event"},
+  {"inputs":[
+    {"internalType":"address","name":"from","type":"address"},
+    {"internalType":"address","name":"to","type":"address"},
+    {"internalType":"uint256","name":"amount","type":"uint256"}
+  ],"name":"transferFrom","outputs":[
+    {"internalType":"bool","name":"","type":"bool"}
+  ],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[
+    {"internalType":"address","name":"newOwner","type":"address"}
+  ],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[
+    {"internalType":"address","name":"owner_","type":"address"},
+    {"internalType":"address","name":"spender","type":"address"}
+  ],"name":"allowance","outputs":[
+    {"internalType":"uint256","name":"","type":"uint256"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[
+    {"internalType":"address","name":"account","type":"address"}
+  ],"name":"balanceOf","outputs":[
+    {"internalType":"uint256","name":"","type":"uint256"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"decimals","outputs":[
+    {"internalType":"uint8","name":"","type":"uint8"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"name","outputs":[
+    {"internalType":"string","name":"","type":"string"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"owner","outputs":[
+    {"internalType":"address","name":"","type":"address"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"symbol","outputs":[
+    {"internalType":"string","name":"","type":"string"}
+  ],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalSupply","outputs":[
+    {"internalType":"uint256","name":"","type":"uint256"}
+  ],"stateMutability":"view","type":"function"}
 ];
 
 let provider, signer, userAddress;
