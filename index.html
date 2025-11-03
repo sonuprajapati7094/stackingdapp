@@ -2,30 +2,34 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>USDT Staking Dashboard</title>
+  <title>USDT Staking — Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <style>
-    /* Minimal dark theme styled to match the screenshot */
-    :root{
-      --bg:#071014; --card:#0e1416; --muted:#9aa3a6; --accent:#f6c84c; --glass: rgba(255,255,255,0.03);
-    }
-    body{background:var(--bg);color:#fff;font-family:Inter,system-ui,Arial;padding:18px}
+    :root{--bg:#071014;--card:#0e1416;--muted:#9aa3a6;--accent:#f6c84c;--glass: rgba(255,255,255,0.03)}
+    body{background:var(--bg);color:#fff;font-family:Inter,system-ui,Arial;margin:0;padding:20px}
     .wrap{max-width:1200px;margin:0 auto}
-    header{display:flex;align-items:center;justify-content:space-between;padding:12px 0}
-    h1{color:var(--accent);margin:0}
+    header{display:flex;align-items:center;justify-content:space-between;padding:6px 0 20px 0}
+    h1{color:var(--accent);margin:0;font-size:28px}
     .btn{background:var(--accent);color:#000;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
-    .card{background:var(--card);padding:16px;border-radius:10px;margin-bottom:12px;box-shadow: 0 6px 18px rgba(0,0,0,0.6)}
-    .grid{display:grid;grid-template-columns:1fr 2fr;gap:16px}
-    input,select{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:#fff;width:100%}
-    .row{display:flex;gap:8px;align-items:center}
+    .card{background:var(--card);padding:16px;border-radius:10px;margin-bottom:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+    input,select,textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:#fff;width:100%}
     .small{font-size:13px;color:var(--muted)}
     .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .stat{background:#071617;padding:12px;border-radius:8px}
     table{width:100%;border-collapse:collapse}
-    th,td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);font-size:14px}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px}
     .muted{color:var(--muted)}
+    .row{display:flex;gap:8px;align-items:center}
     .right{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+    .pill{background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:999px}
+    .flex{display:flex;gap:12px}
+    .lvl-open{color:#8ef58e;font-weight:700}
+    .lvl-pend{color:#f6c84c;font-weight:700}
+    .history-table{max-height:220px;overflow:auto}
+    @media (max-width:1000px){ .grid{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
@@ -39,45 +43,62 @@
     </header>
 
     <div class="grid">
-      <!-- LEFT: Controls -->
+      <!-- LEFT column -->
       <div>
         <div class="card">
           <h3>Stake USDT</h3>
           <div class="small">Minimum deposit 20 USDT</div>
           <div style="margin-top:10px">
             <input id="stakeAmt" placeholder="amount (eg. 20)" />
-            <div style="margin-top:8px" class="row">
+            <div style="margin-top:8px" class="flex">
               <button id="approveBtn" class="btn">Quick Approve</button>
               <button id="stakeBtn" class="btn">Stake Now</button>
             </div>
-            <div class="small" style="margin-top:8px">Tip: Approve once, then stake.</div>
+            <div style="margin-top:10px" class="small">Or stake for someone (P2P)</div>
+            <input id="stakeForAddr" placeholder="referrer address (wallet)"/>
+            <div style="margin-top:8px" class="flex">
+              <button id="stakeForBtn" class="btn">Stake For (P2P)</button>
+            </div>
+            <div class="small" style="margin-top:8px">Tip: Approve token once (Quick Approve) before staking.</div>
           </div>
         </div>
 
         <div class="card">
           <h3>Your Referral Link</h3>
           <input id="refLink" readonly />
-          <div style="margin-top:8px" class="row">
+          <div style="margin-top:8px" class="flex">
             <button id="copyLink" class="btn">Copy Link</button>
             <button id="showTeam" class="btn">Show Team</button>
           </div>
-          <div class="small" style="margin-top:8px">
-            Share this link — users who join via this link will credit you 10% instant on their deposit.
-          </div>
+          <div class="small" style="margin-top:8px">Share this link. New users must join via a valid referral link.</div>
         </div>
 
         <div class="card">
           <h3>Withdraw</h3>
-          <div class="small">Minimum withdraw 20 USDT. Withdrawals require admin approval.</div>
+          <div class="small">Min withdraw 20 USDT. Withdrawal requests require admin approval.</div>
           <input id="withdrawAmt" placeholder="amount (eg. 20)"/>
-          <div style="margin-top:8px" class="row">
+          <div style="margin-top:8px" class="flex">
             <button id="requestWithdraw" class="btn">Request Withdraw</button>
+            <button id="refreshWithdrawals" class="btn">Refresh</button>
           </div>
-          <div id="withdrawStatus" class="small muted" style="margin-top:8px">No withdraw actions yet.</div>
+          <div id="withdrawMsg" class="small muted" style="margin-top:8px">No withdraw actions yet.</div>
         </div>
+
+        <div class="card">
+          <h3>Level Status (L1 → L10)</h3>
+          <div id="levelStatus" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px">
+            <!-- filled by JS -->
+          </div>
+
+          <div style="margin-top:12px">
+            <h4 style="margin:0">Level Income Chart</h4>
+            <canvas id="levelChart" height="160"></canvas>
+          </div>
+        </div>
+
       </div>
 
-      <!-- RIGHT: Dashboard -->
+      <!-- RIGHT column -->
       <div>
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -93,26 +114,26 @@
           <div style="margin-top:12px" class="stat-grid">
             <div class="stat">
               <div class="small muted">Instant Income</div>
-              <div id="instantIncome">0.000000</div>
+              <div id="instantIncome">0.000000 USDT</div>
             </div>
             <div class="stat">
               <div class="small muted">Level Income</div>
-              <div id="levelIncome">0.000000</div>
+              <div id="levelIncome">0.000000 USDT</div>
             </div>
             <div class="stat">
               <div class="small muted">ROI Pending</div>
-              <div id="roiIncome">0.000000</div>
+              <div id="roiIncome">0.000000 USDT</div>
             </div>
           </div>
 
           <div style="margin-top:12px" class="stat-grid">
             <div class="stat">
               <div class="small muted">Total Wallet</div>
-              <div id="totalWallet">0.000000</div>
+              <div id="totalWallet">0.000000 USDT</div>
             </div>
             <div class="stat">
               <div class="small muted">Team Business</div>
-              <div id="teamBusiness">0.000000</div>
+              <div id="teamBusiness">0.000000 USDT</div>
             </div>
             <div class="stat">
               <div class="small muted">Days to 3x</div>
@@ -125,8 +146,8 @@
           <h3>Staking Info</h3>
           <table>
             <tr><th>Metric</th><th>Value</th></tr>
-            <tr><td>Staked</td><td id="staked">0</td></tr>
-            <tr><td>Target (3x)</td><td id="target3x">0</td></tr>
+            <tr><td>Staked</td><td id="staked">0 USDT</td></tr>
+            <tr><td>Target (3x)</td><td id="target3x">0 USDT</td></tr>
             <tr><td>Days to 3x</td><td id="days3x2">-</td></tr>
             <tr><td>Package Status</td><td id="pkgStatus">—</td></tr>
           </table>
@@ -134,14 +155,35 @@
 
         <div class="card">
           <h3>Team & Levels</h3>
-          <div class="row" style="justify-content:space-between">
-            <div><b>Directs</b> <span id="directCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><b>Direct</b> <span id="directCount">0</span></div>
             <div><b>Indirect</b> <span id="indirectCount">0</span></div>
             <div><b>Active/Inactive</b> <span id="activeCount">0 / 0</span></div>
+            <div><button id="loadMoreTeam" class="btn">Reload Team</button></div>
           </div>
           <div style="margin-top:10px">
             <table id="directsTable">
-              <thead><tr><th>Address</th><th>Stake</th></tr></thead>
+              <thead><tr><th>Address</th><th>Stake</th><th>Levels Opened</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Staking History</h3>
+          <div class="history-table">
+            <table id="stakedHistory">
+              <thead><tr><th>When</th><th>User</th><th>From</th><th>Amount</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Withdrawal History (Requests & Approved)</h3>
+          <div class="history-table">
+            <table id="withdrawHistory">
+              <thead><tr><th>When</th><th>User</th><th>Amount</th><th>Approved</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -150,28 +192,32 @@
         <div class="card">
           <h3>Disclaimer</h3>
           <div class="small muted">
-            All investments are at user's own risk. The team/project is not responsible for any financial loss. By staking you agree to these terms.
+            <strong>Risk Notice:</strong> Cryptocurrency investments are risky. By staking you acknowledge you are solely responsible for any loss.
+            The platform provides on-chain staking logic; admin may pause/stop the contract. Do your own research and stake only funds you can afford to lose.
           </div>
         </div>
+
       </div>
     </div>
   </div>
 
 <script>
 /*
-  Frontend for USDTMLMStaking (ethers.js v5)
-  - Update CONTRACT addresses below
-  - Designed for BEP20 testnet + USDT decimals = 6
+  Enhanced index.html:
+  - Uses ethers.js v5
+  - Reads events to build history + level chart (LevelCommissionPaid event)
+  - Works with your deployed contracts on BSC Testnet
+  CONFIG section below — don't forget to keep decimals=6
 */
 
 const CONFIG = {
   tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
   stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
   decimals: 6,
-  chainId: 97 // BSC Testnet chainId
-}
+  chainId: 97 // BSC Testnet
+};
 
-// Minimal ABI — necessary functions used by UI
+// ABI (only functions & events we need)
 const STAKING_ABI = [
   "function register(address referrer) external",
   "function stake(uint256 amount, address referrer) external",
@@ -182,12 +228,14 @@ const STAKING_ABI = [
   "function getTimeTo3x(address userAddr) external view returns (uint256)",
   "function getDirects(address userAddr) external view returns (address[])",
   "function requestWithdrawal(uint256 amount) external",
-  "function getWithdrawal(uint256 wid) external view returns (address user,uint256 amount,bool approved,uint256 timestamp)",
   "function owner() external view returns (address)",
-  // admin functions (for admin page)
-  "function approveWithdrawal(uint256 id) external",
-  "function pauseUser(address userAddr) external",
-  "function unpauseUser(address userAddr) external"
+  "event Registered(address indexed user, address indexed referrer)",
+  "event Staked(address indexed user, address indexed from, uint256 amount)",
+  "event InstantCommissionPaid(address indexed from, address indexed to, uint256 amount)",
+  "event LevelCommissionPaid(address indexed from, address indexed to, uint8 level, uint256 amount)",
+  "event RoiAccrued(address indexed user, uint256 amount)",
+  "event WithdrawalRequested(address indexed user, uint256 id, uint256 amount)",
+  "event WithdrawalApproved(address indexed user, uint256 id, uint256 gross, uint256 net, uint256 fee)"
 ];
 
 const TOKEN_ABI = [
@@ -198,59 +246,56 @@ const TOKEN_ABI = [
 ];
 
 let provider, signer, userAddress;
-let stakingContract, tokenContract;
+let stakingContract, tokenContract, stakingInterface;
+let levelChart;
 
 async function connect() {
   if (!window.ethereum) return alert("Install MetaMask");
   provider = new ethers.providers.Web3Provider(window.ethereum);
-  const network = await provider.getNetwork();
-  // optional: check chainId
-  if (network.chainId !== CONFIG.chainId) {
-    // just warn — let user change
-    console.warn("Connected chainId", network.chainId, "expected", CONFIG.chainId);
+  const net = await provider.getNetwork();
+  if (net.chainId !== CONFIG.chainId) {
+    console.warn("Connected chainId", net.chainId, "expected", CONFIG.chainId);
   }
   await provider.send("eth_requestAccounts", []);
   signer = provider.getSigner();
   userAddress = await signer.getAddress();
   document.getElementById('statusText').innerText = "Connected";
   document.getElementById('addrDisplay').innerText = `Address: ${userAddress}`;
+  document.getElementById('connectBtn').innerText = "Connected ✓";
   stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
   tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
-  // set referral link
-  const url = new URL(window.location.href);
-  const refParam = url.searchParams.get('ref');
+  stakingInterface = new ethers.utils.Interface(STAKING_ABI);
+  // set ref link
   const refLinkInput = document.getElementById('refLink');
-  const myRef = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
-  refLinkInput.value = myRef;
-  // elements
-  document.getElementById('connectBtn').innerText = "Connected ✓";
+  refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
+  // draw blank level boxes
+  drawLevelBoxes();
   await refreshAll();
+  // initialize chart
+  initChart();
+  await loadLevelEarnings();
+  await loadEventHistories();
 }
 
-// -------- helpers
-function toUnits(amount) {
-  return ethers.utils.parseUnits(String(amount), CONFIG.decimals);
-}
-function fromUnits(big) {
-  try { return Number(ethers.utils.formatUnits(big, CONFIG.decimals)); } catch(e){ return 0 }
-}
-
-// -------- UI actions
-document.getElementById('connectBtn').onclick = connect;
-document.getElementById('refreshBtn').onclick = refreshAll;
-
+// approve large allowance
 document.getElementById('approveBtn').onclick = async () => {
-  const amt = toUnits("1000000"); // large approve
-  await tokenContract.approve(CONFIG.stakingAddress, amt);
-  alert("Approved (large)");
+  if (!tokenContract) return alert("Connect wallet");
+  const big = ethers.constants.MaxUint256;
+  try {
+    const tx = await tokenContract.approve(CONFIG.stakingAddress, big);
+    await tx.wait();
+    alert("Approved");
+  } catch(e){ console.error(e); alert("Approve failed: "+(e?.message||e)) }
 };
 
+// stake for self (uses ref param if present)
 document.getElementById('stakeBtn').onclick = async () => {
+  if (!stakingContract) return alert("Connect wallet");
   const v = document.getElementById('stakeAmt').value;
   if (!v || Number(v) < 20) return alert("Enter >= 20 USDT");
+  // use ref query param if exists (user joins via link); else pass zero (owner allowed)
   const url = new URL(window.location.href);
   const refParam = url.searchParams.get('ref');
-  // use ref param if present else empty (owner can stake without ref)
   const refAddr = refParam || ethers.constants.AddressZero;
   const amt = toUnits(v);
   try {
@@ -258,22 +303,45 @@ document.getElementById('stakeBtn').onclick = async () => {
     await tx.wait();
     alert("Staked!");
     await refreshAll();
-  } catch (e) {
-    console.error(e); alert("Stake failed: " + (e?.data?.message || e?.message || e));
-  }
+    await loadEventHistories();
+  } catch(e){ console.error(e); alert("Stake failed: " + (e?.data?.message || e?.message || e)); }
 };
 
+// P2P stake
+document.getElementById('stakeForBtn').onclick = async () => {
+  if (!stakingContract) return alert("Connect wallet");
+  const v = document.getElementById('stakeAmt').value;
+  const toAddr = document.getElementById('stakeForAddr').value;
+  if (!toAddr) return alert("Enter recipient address");
+  if (!v || Number(v) < 20) return alert("Enter >= 20 USDT");
+  const amt = toUnits(v);
+  // if refForRefUser not provided, we try to use owner as ref if recipient not registered.
+  // We will pass owner as fallback; contract requires a ref if recipient not registered.
+  const ownerAddr = await stakingContract.owner();
+  try {
+    const tx = await stakingContract.stakeFor(toAddr, amt, ownerAddr);
+    await tx.wait();
+    alert("Staked for user!");
+    await refreshAll();
+    await loadEventHistories();
+  } catch(e){ console.error(e); alert("StakeFor failed: " + (e?.data?.message || e?.message || e)); }
+};
+
+// copy link
 document.getElementById('copyLink').onclick = () => {
   const v = document.getElementById('refLink').value;
   navigator.clipboard.writeText(v);
   alert("Copied link");
 };
 
+// show team (basic)
 document.getElementById('showTeam').onclick = async () => {
-  await showTeam();
+  await loadDirects(userAddress, true);
 };
 
+// request withdraw
 document.getElementById('requestWithdraw').onclick = async () => {
+  if (!stakingContract) return alert("Connect wallet");
   const v = document.getElementById('withdrawAmt').value;
   if (!v || Number(v) < 20) return alert("Min withdraw 20 USDT");
   const amt = toUnits(v);
@@ -281,27 +349,31 @@ document.getElementById('requestWithdraw').onclick = async () => {
     const tx = await stakingContract.requestWithdrawal(amt);
     await tx.wait();
     alert("Withdrawal requested (pending admin approval)");
-  } catch (e) {
-    console.error(e); alert("Request failed: " + (e?.data?.message || e?.message || e));
-  }
+    await loadWithdrawHistory();
+  } catch(e){ console.error(e); alert("Req failed: " + (e?.message||e)); }
 };
 
-// -------- core refresh
-async function refreshAll() {
+document.getElementById('loadMoreTeam').onclick = async ()=> { await loadDirects(userAddress, false); }
+document.getElementById('refreshBtn').onclick = refreshAll;
+document.getElementById('refreshWithdrawals').onclick = loadWithdrawHistory;
+
+// ---------- helpers ----------
+function toUnits(amount){ return ethers.utils.parseUnits(String(amount), CONFIG.decimals); }
+function fromUnits(b){ try { return Number(ethers.utils.formatUnits(b, CONFIG.decimals)); } catch(e){ return 0 } }
+
+async function refreshAll(){
   if (!signer) return;
-  // update token balance
   try {
     const bal = await tokenContract.balanceOf(userAddress);
     document.getElementById('balanceDisplay').innerText = `USDT Balance: ${fromUnits(bal).toFixed(6)} USDT`;
   } catch(e){ console.error(e) }
 
-  // call updateRewards for current user (so ROI accrues on-chain)
+  // call updateRewards to ensure ROI accrual is recorded
   try { await stakingContract.updateRewards(userAddress); } catch(e){ /* ignore */ }
 
   // fetch user info
   try {
     const info = await stakingContract.getUserInfo(userAddress);
-    // returns tuple: totalStake, roiIncome, instantIncome, levelIncome, totalEarned, totalWithdrawn, isActive, directsCount
     const staked = fromUnits(info[0]);
     const roiIncome = fromUnits(info[1]);
     const instantIncome = fromUnits(info[2]);
@@ -320,60 +392,214 @@ async function refreshAll() {
     const withdrawable = await stakingContract.getWithdrawable(userAddress);
     document.getElementById('totalWallet').innerText = fromUnits(withdrawable).toFixed(6) + " USDT";
 
-    // time to 3x
     const days = await stakingContract.getTimeTo3x(userAddress);
     document.getElementById('days3x').innerText = String(Number(days));
     document.getElementById('days3x2').innerText = String(Number(days));
 
-    // target 3x
     document.getElementById('target3x').innerText = (staked * 3).toFixed(6) + " USDT";
-    // directs
     document.getElementById('directCount').innerText = directsCount;
-    // simple active/inactive count: check direct addresses
-    await loadDirects(userAddress);
-  } catch (e) {
-    console.error(e);
-  }
-}
 
-// fetch directs and build small table and team business (simple)
-async function loadDirects(addr) {
-  try {
-    const directs = await stakingContract.getDirects(addr);
-    const tbody = document.querySelector('#directsTable tbody');
-    tbody.innerHTML = "";
-    let teamBusiness = 0;
-    let active = 0, inactive = 0;
-    for (let d of directs) {
-      // get user info for each direct
-      const info = await stakingContract.getUserInfo(d);
-      const st = fromUnits(info[0]);
-      const isActive = info[6];
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${d}</td><td>${st.toFixed(6)} USDT</td>`;
-      tbody.appendChild(tr);
-      teamBusiness += st;
-      if (isActive) active++; else inactive++;
-    }
-    document.getElementById('teamBusiness').innerText = teamBusiness.toFixed(6) + " USDT";
-    document.getElementById('indirectCount').innerText = "—";
-    document.getElementById('activeCount').innerText = `${active} / ${inactive}`;
+    await loadDirects(userAddress, false);
+    await loadLevelEarnings(); // rebuild chart from events
+    await loadWithdrawHistory();
+    await loadStakedHistory();
   } catch(e){ console.error(e) }
 }
 
-async function showTeam() {
-  const directs = await stakingContract.getDirects(userAddress);
-  let msg = "Direct referrals:\n";
-  for (let d of directs) msg += `${d}\n`;
-  alert(msg || "No directs");
+// draws L1..L10 status boxes
+function drawLevelBoxes(){
+  const container = document.getElementById('levelStatus');
+  container.innerHTML = "";
+  for (let i=1;i<=10;i++){
+    const el = document.createElement('div');
+    el.className = 'pill';
+    el.id = `lvlbox${i}`;
+    el.innerText = `L${i} — PENDING`;
+    container.appendChild(el);
+  }
 }
 
-// auto-connect if already connected
-if (window.ethereum && window.ethereum.selectedAddress) {
-  // do nothing — wait for user click
+// load directs and show their level-opening effect
+async function loadDirects(addr, alertList){
+  try {
+    const directs = await stakingContract.getDirects(addr);
+    document.getElementById('directCount').innerText = directs.length;
+    const tbody = document.querySelector('#directsTable tbody');
+    tbody.innerHTML = "";
+    let teamBusiness = 0;
+    let active=0,inactive=0;
+    // for each direct, get info; also compute how many levels they open (they always open 1 level each direct)
+    for (let d of directs){
+      const info = await stakingContract.getUserInfo(d);
+      const st = fromUnits(info[0]);
+      const isAct = info[6];
+      teamBusiness += st;
+      if (isAct) active++; else inactive++;
+      // levels opened by this direct = 1 (by rule) but overall user's opened levels = count(directs)
+      const levelsOpened = 1; // each direct opens 1 level
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${d}</td><td>${st.toFixed(6)} USDT</td><td>${levelsOpened}</td>`;
+      tbody.appendChild(row);
+    }
+    document.getElementById('teamBusiness').innerText = teamBusiness.toFixed(6)+" USDT";
+    document.getElementById('activeCount').innerText = `${active} / ${inactive}`;
+    // set level boxes based on directs count
+    const directsCount = directs.length;
+    for (let i=1;i<=10;i++){
+      const el = document.getElementById(`lvlbox${i}`);
+      if (directsCount >= i){ el.innerText = `L${i} — OPEN`; el.className='lvl-open'; }
+      else { el.innerText = `L${i} — PENDING`; el.className='lvl-pend'; }
+    }
+    if (alertList){
+      alert("Directs:\n" + directs.join("\n"));
+    }
+  } catch(e){ console.error(e) }
 }
 
-// track query param ref: if page opened with ?ref=0x..., we store it in localStorage for stake usage
+// ========== Event history (Staked + Withdrawal + LevelCommissionPaid) ==========
+async function loadEventHistories(){
+  await loadStakedHistory();
+  await loadWithdrawHistory();
+  await loadLevelEarnings();
+}
+
+// staked history (uses Staked event)
+async function loadStakedHistory(){
+  const table = document.querySelector('#stakedHistory tbody');
+  table.innerHTML = "";
+  const iface = stakingInterface;
+  const topic = iface.getEventTopic("Staked");
+  const filter = { address: CONFIG.stakingAddress, topics: [topic] };
+  try {
+    const logs = await provider.getLogs(filter);
+    // parse logs and sort descending by blockNumber
+    const items = logs.map(l => ({ ...l, parsed: iface.parseLog(l) })).sort((a,b)=>b.blockNumber-a.blockNumber).slice(0,100);
+    for (let item of items){
+      const ev = item.parsed;
+      const when = new Date((await provider.getBlock(item.blockNumber)).timestamp * 1000).toLocaleString();
+      const user = ev.args.user;
+      const from = ev.args.from;
+      const amount = fromUnits(ev.args.amount);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${when}</td><td>${user}</td><td>${from}</td><td>${amount.toFixed(6)} USDT</td>`;
+      table.appendChild(tr);
+    }
+  } catch(e){ console.error(e) }
+}
+
+// withdrawal history — we will read WithdrawalRequested & WithdrawalApproved events and combine
+async function loadWithdrawHistory(){
+  const tbody = document.querySelector('#withdrawHistory tbody');
+  tbody.innerHTML = "";
+  const iface = stakingInterface;
+  const topicReq = iface.getEventTopic("WithdrawalRequested");
+  const topicApv = iface.getEventTopic("WithdrawalApproved");
+  try {
+    const logsReq = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topicReq] });
+    const logsApv = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topicApv] });
+    // map approvals by id
+    const apvById = {};
+    for (let l of logsApv){
+      const ev = iface.parseLog(l);
+      apvById[ev.args.id.toString()] = ev.args;
+    }
+    const items = logsReq.map(l => ({ l, ev: iface.parseLog(l) })).sort((a,b)=>b.l.blockNumber - a.l.blockNumber);
+    for (let it of items){
+      const ev = it.ev;
+      const when = new Date((await provider.getBlock(it.l.blockNumber)).timestamp * 1000).toLocaleString();
+      const user = ev.args.user;
+      const id = ev.args.id.toString();
+      const amt = fromUnits(ev.args.amount);
+      const approved = apvById[id] ? true : false;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${when}</td><td>${user}</td><td>${amt.toFixed(6)} USDT</td><td>${approved ? 'Yes' : 'Pending'}</td>`;
+      tbody.appendChild(tr);
+    }
+  } catch(e){ console.error(e) }
+}
+
+// level earnings chart: read LevelCommissionPaid events where to = userAddress and aggregate by level
+async function loadLevelEarnings(){
+  if (!provider || !userAddress) return;
+  const iface = stakingInterface;
+  const topic = iface.getEventTopic("LevelCommissionPaid");
+  // topics: [topic, from, to, ...]; we want logs where "to" == userAddress, so topics[2] is userAddress
+  const toTopic = ethers.utils.hexZeroPad(userAddress, 32);
+  try {
+    const logs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topic, null, toTopic] });
+    // sum amounts per level
+    const perLevel = new Array(10).fill(0);
+    for (let l of logs){
+      const ev = iface.parseLog(l);
+      const level = Number(ev.args.level) - 1; // event level is 1-based
+      const amt = fromUnits(ev.args.amount);
+      if (level >=0 && level < 10) perLevel[level] += amt;
+    }
+    // update chart
+    updateChart(perLevel);
+    // also update total levelIncome display from contract
+    try {
+      const info = await stakingContract.getUserInfo(userAddress);
+      document.getElementById('levelIncome').innerText = fromUnits(info[3]).toFixed(6) + " USDT";
+    } catch(e){}
+  } catch(e){ console.error(e) }
+}
+
+// Chart functions
+function initChart(){
+  const ctx = document.getElementById('levelChart').getContext('2d');
+  levelChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10'],
+      datasets: [{
+        label: 'Earned (USDT) per Level',
+        data: new Array(10).fill(0),
+        backgroundColor: 'rgba(246,200,76,0.9)'
+      }]
+    },
+    options: {
+      responsive:true,
+      scales:{ y: { beginAtZero:true } }
+    }
+  });
+}
+function updateChart(arr){
+  if (!levelChart) return;
+  levelChart.data.datasets[0].data = arr;
+  levelChart.update();
+}
+
+// ========== Fetch & show level percents (L1..L10) and open/pending status ============
+async function loadLevelPercents(){
+  // contract doesn't expose an array getter in ABI here easily, so we'll read via public getter if available.
+  // If not available, fallback to known config.
+  try {
+    const perc = [];
+    for (let i=0;i<10;i++){
+      const p = await stakingContract.levelPercents(i);
+      perc.push(Number(p));
+    }
+    return perc;
+  } catch(e){
+    // fallback default as per contract design
+    return [1000,1000,500,300,200,100,100,100,100,100];
+  }
+}
+
+// ========== Initial data loads ============
+async function initPageAfterConnect(){
+  drawLevelBoxes();
+  await refreshAll();
+  initChart();
+  await loadLevelEarnings();
+  await loadEventHistories();
+}
+
+// auto connect button
+document.getElementById('connectBtn').onclick = connect;
+
+// auto-store ref param
 (function storeRefFromUrl(){
   const url = new URL(window.location.href);
   const r = url.searchParams.get('ref');

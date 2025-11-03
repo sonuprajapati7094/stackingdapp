@@ -16,50 +16,52 @@
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h2>Admin Panel — USDT Staking</h2>
-  <div class="card">
-    <div><b>Connected as:</b> <span id="addr"></span></div>
-    <div style="margin-top:10px"><button id="connect" class="btn">Connect MetaMask</button></div>
-  </div>
+  <div class="wrap">
+    <h2>Admin Panel — USDT Staking</h2>
 
-  <div class="card">
-    <h3>Withdraw Approval</h3>
-    <div class="row" style="display:flex;gap:8px">
-      <input id="wid" placeholder="Withdrawal ID"/>
-      <button id="approveWid" class="btn">Approve Withdrawal</button>
+    <div class="card">
+      <div><b>Connected as:</b> <span id="addr">-</span></div>
+      <div style="margin-top:10px"><button id="connect" class="btn">Connect MetaMask</button></div>
     </div>
-    <div id="approveResult" style="margin-top:8px;color:#ddd"></div>
-  </div>
 
-  <div class="card">
-    <h3>Pause / Unpause User</h3>
-    <div style="display:flex;gap:8px">
-      <input id="pauseAddr" placeholder="user address"/>
-      <button id="pauseBtn" class="btn">Pause</button>
-      <button id="unpauseBtn" class="btn">Unpause</button>
+    <div class="card">
+      <h3>Pending Withdrawals</h3>
+      <div style="margin-bottom:8px" class="small">Approve user withdrawal requests here.</div>
+      <table id="pendingTable">
+        <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>When</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:8px"><button id="refreshPending" class="btn">Refresh Pending</button></div>
     </div>
-  </div>
 
-  <div class="card">
-    <h3>Set ROI / Fee</h3>
-    <div style="display:flex;gap:8px">
-      <input id="roiBps" placeholder="dailyROI bps (100 = 1%)"/>
-      <input id="feeBps" placeholder="withdraw fee bps (500 = 5%)"/>
-      <button id="setParams" class="btn">Set</button>
+    <div class="card">
+      <h3>Pause / Unpause User</h3>
+      <div style="display:flex;gap:8px">
+        <input id="pauseAddr" placeholder="user address"/>
+        <button id="pauseBtn" class="btn">Pause</button>
+        <button id="unpauseBtn" class="btn">Unpause</button>
+      </div>
     </div>
-    <div id="setResult" style="margin-top:8px;color:#ddd"></div>
-  </div>
 
-  <div class="card">
-    <h3>Emergency</h3>
-    <div style="display:flex;gap:8px">
-      <input id="emTo" placeholder="to address"/>
-      <button id="emBtn" class="btn">Emergency Withdraw All</button>
+    <div class="card">
+      <h3>Set ROI / Fee</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="roiBps" placeholder="dailyROI bps (100 = 1%)"/>
+        <input id="feeBps" placeholder="withdraw fee bps (500 = 5%)"/>
+        <button id="setParams" class="btn">Set</button>
+      </div>
+      <div id="setResult" style="margin-top:8px;color:#ddd"></div>
     </div>
-    <div id="emRes" style="margin-top:8px;color:#ddd"></div>
+
+    <div class="card">
+      <h3>Emergency</h3>
+      <div style="display:flex;gap:8px">
+        <input id="emTo" placeholder="to address"/>
+        <button id="emBtn" class="btn">Emergency Withdraw All</button>
+      </div>
+      <div id="emRes" style="margin-top:8px;color:#ddd"></div>
+    </div>
   </div>
-</div>
 
 <script>
 const CONFIG = {
@@ -75,7 +77,9 @@ const STAKING_ABI = [
   "function unpauseUser(address userAddr) external",
   "function setDailyRoi(uint256 bps) external",
   "function setWithdrawFee(uint256 bps) external",
-  "function emergencyWithdrawAll(address to) external"
+  "function emergencyWithdrawAll(address to) external",
+  "event WithdrawalRequested(address indexed user, uint256 id, uint256 amount)",
+  "event WithdrawalApproved(address indexed user, uint256 id, uint256 gross, uint256 net, uint256 fee)"
 ];
 
 let provider, signer, addr, staking;
@@ -88,22 +92,53 @@ document.getElementById('connect').onclick = async () => {
   addr = await signer.getAddress();
   document.getElementById('addr').innerText = addr;
   staking = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
-  // verify owner
   const owner = await staking.owner();
-  if (owner.toLowerCase() !== addr.toLowerCase()) {
-    alert("Warning: Connected account is not owner. Admin actions will fail.");
+  if (owner.toLowerCase() !== addr.toLowerCase()){
+    alert("Warning: connected account is not owner.");
   }
+  await loadPending();
 };
 
-document.getElementById('approveWid').onclick = async () => {
-  const id = document.getElementById('wid').value;
-  if (!id) return alert("Enter id");
+document.getElementById('refreshPending').onclick = loadPending;
+
+async function loadPending(){
+  if (!provider) return alert("Connect");
+  const iface = new ethers.utils.Interface(STAKING_ABI);
+  const topic = iface.getEventTopic("WithdrawalRequested");
   try {
-    const tx = await staking.approveWithdrawal(Number(id));
-    await tx.wait();
-    document.getElementById('approveResult').innerText = "Approved id " + id;
-  } catch(e){ console.error(e); alert("Approve failed: " + (e?.message || e)); }
-};
+    const logs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [topic] });
+    const items = logs.map(l => ({ l, ev: iface.parseLog(l) })).sort((a,b)=>b.l.blockNumber - a.l.blockNumber);
+    const tbody = document.querySelector('#pendingTable tbody');
+    tbody.innerHTML = "";
+    for (let it of items){
+      const ev = it.ev;
+      const id = ev.args.id.toString();
+      const user = ev.args.user;
+      const amt = ethers.utils.formatUnits(ev.args.amount, CONFIG.decimals);
+      const when = new Date((await provider.getBlock(it.l.blockNumber)).timestamp*1000).toLocaleString();
+      // check if approved by searching WithdrawalApproved event
+      const apvTopic = iface.getEventTopic("WithdrawalApproved");
+      const apvLogs = await provider.getLogs({ address: CONFIG.stakingAddress, topics: [apvTopic] });
+      const approvedIds = new Set(apvLogs.map(l=>iface.parseLog(l).args.id.toString()));
+      if (approvedIds.has(id)) continue; // skip already approved
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${id}</td><td>${user}</td><td>${Number(amt).toFixed(6)}</td><td>${when}</td><td><button class="btn approve" data-id="${id}">Approve</button></td>`;
+      tbody.appendChild(tr);
+    }
+    // add listeners
+    document.querySelectorAll('.approve').forEach(b=>{
+      b.onclick = async (e)=>{
+        const id = e.target.dataset.id;
+        try {
+          const tx = await staking.approveWithdrawal(Number(id));
+          await tx.wait();
+          alert("Approved "+id);
+          await loadPending();
+        } catch(err){ console.error(err); alert("Approve failed: "+(err?.message||err)); }
+      };
+    });
+  } catch(e){ console.error(e); alert("Failed to load pending"); }
+}
 
 document.getElementById('pauseBtn').onclick = async () => {
   const a = document.getElementById('pauseAddr').value;
@@ -116,15 +151,15 @@ document.getElementById('unpauseBtn').onclick = async () => {
   try { const tx = await staking.unpauseUser(a); await tx.wait(); alert("Unpaused"); } catch(e){ alert(e?.message||e) }
 };
 
-document.getElementById('setParams').onclick = async () => {
+document.getElementById('setParams').onclick = async ()=>{
   const r = document.getElementById('roiBps').value;
   const f = document.getElementById('feeBps').value;
-  if (!r && !f) return alert("Enter params");
+  if (!r && !f) return alert("Enter values");
   try {
     if (r) { const tx = await staking.setDailyRoi(Number(r)); await tx.wait(); }
-    if (f) { const tx2 = await staking.setWithdrawFee(Number(f)); await tx2.wait(); }
-    document.getElementById('setResult').innerText = "Params updated";
-  } catch(e){ alert("Failed: " + (e?.message||e)) }
+    if (f) { const tx = await staking.setWithdrawFee(Number(f)); await tx.wait(); }
+    document.getElementById('setResult').innerText = "Parameters updated";
+  } catch(e){ alert("Failed: "+(e?.message||e)); }
 };
 
 document.getElementById('emBtn').onclick = async () => {
@@ -134,7 +169,7 @@ document.getElementById('emBtn').onclick = async () => {
     const tx = await staking.emergencyWithdrawAll(to);
     await tx.wait();
     document.getElementById('emRes').innerText = "Emergency withdraw executed";
-  } catch(e){ alert("Failed: " + (e?.message||e)) }
+  } catch(e){ alert("Failed: " + (e?.message||e)); }
 };
 
 </script>
