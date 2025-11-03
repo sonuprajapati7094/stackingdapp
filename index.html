@@ -224,6 +224,26 @@
   </div><!-- wrap -->
 
 <script>
+  window.addEventListener("load", async () => {
+  if (window.ethereum) {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const accounts = await provider.listAccounts();
+    if (accounts.length === 0) {
+      console.log("🟡 No wallet connected — requesting access");
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+      } catch (e) {
+        console.warn("Auto connect rejected:", e);
+      }
+    } else {
+      console.log("✅ Auto connected wallet:", accounts[0]);
+      await connectWallet(true);
+    }
+  } else {
+    console.warn("⚠️ MetaMask not found");
+  }
+});
+
 const CONFIG = {
   tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
   stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
