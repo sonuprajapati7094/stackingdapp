@@ -368,35 +368,84 @@ const TOKEN_ABI = [
 
 let provider, signer, userAddress;
 let stakingContract, tokenContract, stakingInterface;
-let levelChart;
+
+async function initProvider() {
+  if (!window.ethereum) {
+    alert("MetaMask not detected! Please install MetaMask extension.");
+    return;
+  }
+
+  // create provider (with "any" ensures reactivity on network change)
+  provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+  const network = await provider.getNetwork();
+
+  // check if BSC Testnet
+  if (network.chainId !== 97) {
+    alert("Please switch MetaMask network to Binance Smart Chain Testnet!");
+  }
+
+  // listen to account / network change
+  window.ethereum.on('accountsChanged', () => window.location.reload());
+  window.ethereum.on('chainChanged', () => window.location.reload());
+}
 
 async function connect() {
-  if (!window.ethereum) return alert("Install MetaMask");
-  provider = new ethers.providers.Web3Provider(window.ethereum);
-  const net = await provider.getNetwork();
-  if (net.chainId !== CONFIG.chainId) {
-    console.warn("Connected chainId", net.chainId, "expected", CONFIG.chainId);
+  try {
+    if (!provider) await initProvider();
+
+    // request wallet access
+    await provider.send("eth_requestAccounts", []);
+    signer = provider.getSigner();
+    userAddress = await signer.getAddress();
+
+    // update UI
+    document.getElementById('connectBtn').innerText = "Connected ✓";
+    document.getElementById('statusText').innerText = "Connected";
+    document.getElementById('addrDisplay').innerText = `Address: ${userAddress}`;
+
+    // initialize contracts
+    stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
+    tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
+    stakingInterface = new ethers.utils.Interface(STAKING_ABI);
+
+    // show referral link
+    const refLinkInput = document.getElementById('refLink');
+    refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
+
+    // load dashboard
+    await refreshAll();
+    drawLevelBoxes();
+    initChart();
+    await loadLevelEarnings();
+    await loadEventHistories();
+
+  } catch (err) {
+    console.error("Wallet connect failed:", err);
+    alert("Wallet connection failed. Please try again.");
   }
-  await provider.send("eth_requestAccounts", []);
-  signer = provider.getSigner();
-  userAddress = await signer.getAddress();
-  document.getElementById('statusText').innerText = "Connected";
-  document.getElementById('addrDisplay').innerText = `Address: ${userAddress}`;
-  document.getElementById('connectBtn').innerText = "Connected ✓";
-  stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
-  tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
-  stakingInterface = new ethers.utils.Interface(STAKING_ABI);
-  // set ref link
-  const refLinkInput = document.getElementById('refLink');
-  refLinkInput.value = `${window.location.origin + window.location.pathname}?ref=${userAddress}`;
-  // draw blank level boxes
-  drawLevelBoxes();
-  await refreshAll();
-  // initialize chart
-  initChart();
-  await loadLevelEarnings();
-  await loadEventHistories();
 }
+
+// ✅ Auto-connect logic (runs on page load)
+window.addEventListener('load', async () => {
+  await initProvider();
+
+  try {
+    const accounts = await provider.listAccounts();
+    if (accounts.length > 0) {
+      console.log("Auto-connecting existing wallet:", accounts[0]);
+      await connect();
+    } else {
+      document.getElementById('statusText').innerText = "Please connect wallet.";
+    }
+  } catch (err) {
+    console.warn("Auto connect skipped:", err);
+  }
+
+  // also attach manual button click
+  const btn = document.getElementById('connectBtn');
+  if (btn) btn.addEventListener('click', connect);
+});
+
 
 // approve large allowance
 document.getElementById('approveBtn').onclick = async () => {
