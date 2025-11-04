@@ -485,6 +485,24 @@ async function updateROIIfNeeded() {
   }
   return;
 }
+/* ========== ROI LIVE UPDATE (frontend only) ========== */
+let roiTimer;
+
+function startROILiveIncrement(roiStart, staked, dailyRateBps = 100) {
+  // clear previous interval
+  if (roiTimer) clearInterval(roiTimer);
+
+  // daily ROI rate (BPS → percentage)
+  const roiPerSecond = (staked * (dailyRateBps / 10000)) / 86400; // 1 day = 86400s
+  let roiValue = roiStart;
+
+  // update every second
+  roiTimer = setInterval(() => {
+    roiValue += roiPerSecond;
+    const roiEl = document.getElementById("roiPending");
+    if (roiEl) roiEl.innerText = `${roiValue.toFixed(6)} USDT`;
+  }, 1000);
+}
 
 /* ======= REFRESH ALL: populates UI ======= */
 async function refreshAll() {
@@ -513,6 +531,8 @@ async function refreshAll() {
     document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
     document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
     document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
+    // 🟢 Start Live ROI frontend animation
+startROILiveIncrement(roiPending, staked, 100); // 100 BPS = 1% daily (change as per your contract)
 
     document.getElementById("pkgStatus").innerText = info[8] ? "✅ Active" : "Inactive";
 
