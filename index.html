@@ -513,8 +513,6 @@ async function refreshAll() {
     document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
     document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
     document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
-    // 🟢 Start Live ROI frontend animation
-startROILiveIncrement(roiPending, staked, 100); // 100 BPS = 1% daily (change as per your contract)
 
     document.getElementById("pkgStatus").innerText = info[8] ? "✅ Active" : "Inactive";
 
