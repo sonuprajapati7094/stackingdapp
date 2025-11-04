@@ -528,11 +528,37 @@ async function refreshAll() {
     document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
     document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
     document.getElementById("roiPending").innerText = `${toFixedNumber(roiPending, 6)} USDT`;
+    startROILiveIncrement(roiPending, staked, 100);
     document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
     document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
     document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
+    
     // 🟢 Start Live ROI frontend animation
-startROILiveIncrement(roiPending, staked, 100); // 100 BPS = 1% daily (change as per your contract)
+/* ========== ROI LIVE UPDATE (frontend only, fixed version) ========== */
+let roiTimer;
+
+function startROILiveIncrement(roiStart, staked, dailyRateBps = 100) {
+  // Stop old interval if already running
+  if (roiTimer) clearInterval(roiTimer);
+
+  // Safety check
+  if (!staked || staked <= 0) return;
+
+  // Calculate ROI per second
+  const roiPerSecond = (staked * (dailyRateBps / 10000)) / 86400;
+  let roiValue = roiStart || 0;
+
+  // First display the current ROI immediately
+  const roiEl = document.getElementById("roiPending");
+  if (roiEl) roiEl.innerText = `${roiValue.toFixed(6)} USDT`;
+
+  // Then keep adding ROI every second
+  roiTimer = setInterval(() => {
+    roiValue += roiPerSecond;
+    if (roiEl) roiEl.innerText = `${roiValue.toFixed(6)} USDT`;
+  }, 1000);
+}
+
 
     document.getElementById("pkgStatus").innerText = info[8] ? "✅ Active" : "Inactive";
 
