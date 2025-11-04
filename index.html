@@ -511,14 +511,21 @@ async function refreshAll() {
       `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
 
     // === USER INFO ===
-    const info = await stakingContract.users(account);
+    // ✅ Get user info properly
+let info;
+try {
+  info = await stakingContract.users(account);
+} catch (e) {
+  console.error("User info fetch failed:", e);
+  return;
+}
 
-    const staked = fromUnits(info.totalStake || 0);
-    const roiPending = fromUnits(info.roiIncome || 0);
-    const instantIncome = fromUnits(info.instantIncome || 0);
-    const levelIncome = fromUnits(info.levelIncome || 0);
-    const totalEarned = fromUnits(info.totalEarned || 0);
-    const isActive = info.isActive || false;
+    // ✅ Convert array struct to readable form
+const staked = fromUnits(info[1] || 0);          // totalStake
+const roiPending = fromUnits(info[5] || 0);      // roiIncome
+const instantIncome = fromUnits(info[6] || 0);   // instantIncome
+const levelIncome = fromUnits(info[7] || 0);     // levelIncome
+const totalEarned = roiPending + instantIncome + levelIncome;
 
     document.getElementById("pkgStatus").innerText = isActive ? "Active ✅" : "Inactive ❌";
 
