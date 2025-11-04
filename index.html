@@ -140,6 +140,15 @@
         <tr><td>Package Status</td><td id="pkgStatus">Inactive</td></tr>
       </table>
     </div>
+    <!-- ===== Progress Bar (3x Target) ===== -->
+<div id="progressSection" style="margin-top: 15px;">
+  <p style="margin-bottom: 6px; color: #ffcc00; font-weight: bold;">Progress to 3× Goal</p>
+  <div style="width:100%; background:#333; border-radius:8px; height:10px; overflow:hidden;">
+    <div id="progressFill" style="height:100%; width:0%; background:linear-gradient(90deg,#ffcc00,#00ff99); transition:width 1s;"></div>
+  </div>
+  <p id="progressLabel" style="margin-top:4px; font-size:13px; color:#aaa;">0% completed</p>
+</div>
+
 
     <div class="card">
       <h2>Team & Levels</h2>
@@ -478,53 +487,62 @@ async function updateROIIfNeeded() {
 }
 
 /* ======= REFRESH ALL: populates UI ======= */
-async function refreshAll(){
+async function refreshAll() {
   if (!stakingContract || !account) return;
   await updateROIIfNeeded();
   try {
-    // wallet token balance
+    // 🪙 Wallet token balance
     const rawBal = await tokenContract.balanceOf(account);
     const walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText = `${account} — ${toFixedNumber(walletBal,4)} USDT`;
+    document.getElementById("walletDisplay").innerText = `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
 
-    // user info (users mapping)
+    // 👤 User info (users mapping)
     const info = await stakingContract.users(account);
-    // Users tuple indexes (from ABI): [referrer, totalStake(1), totalWithdrawn(2), totalEarned(3), lastRoiUpdate(4), roiIncome(5), instantIncome(6), levelIncome(7), isActive(8), isPaused(9), inactiveAt(10)]
+    // [referrer, totalStake(1), totalWithdrawn(2), totalEarned(3), lastRoiUpdate(4), roiIncome(5), instantIncome(6), levelIncome(7), isActive(8), isPaused(9), inactiveAt(10)]
     const staked = fromUnits(info[1] || 0);
+    const totalEarned = fromUnits(info[3] || 0);
     const roiPending = fromUnits(info[5] || 0);
     const instantIncome = fromUnits(info[6] || 0);
     const levelIncome = fromUnits(info[7] || 0);
     const totalWallet = roiPending + instantIncome + levelIncome;
 
-    document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked,6)} USDT`;
-    document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked*3,6)} USDT`;
-    document.getElementById("roiPending").innerText = `${toFixedNumber(roiPending,6)} USDT`;
-    document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome,6)} USDT`;
-    document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome,6)} USDT`;
-    document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet,6)} USDT`;
+    // 🧾 Update main UI fields
+    document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
+    document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
+    document.getElementById("roiPending").innerText = `${toFixedNumber(roiPending, 6)} USDT`;
+    document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
+    document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
+    document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
 
     document.getElementById("pkgStatus").innerText = info[8] ? "✅ Active" : "Inactive";
 
-    // days to 3x
+    // 📆 Days to 3x
     try {
       const daysBn = await stakingContract.getTimeTo3x(account);
       document.getElementById("days3x").innerText = (Number(daysBn) || 0) + " days";
-    } catch (e) { document.getElementById("days3x").innerText = "N/A"; }
+    } catch (e) {
+      document.getElementById("days3x").innerText = "N/A";
+    }
 
-    // direct refs
-    let directCount = 0, indirectCount = 0, active = 0, inactive = 0, teamBusiness = 0;
+    // 👥 Direct & Indirect team
+    let directCount = 0,
+      indirectCount = 0,
+      active = 0,
+      inactive = 0,
+      teamBusiness = 0;
     if (stakingContract.getDirectRefs) {
-      const directs = await stakingContract.getDirectRefs(account).catch(()=>[]);
+      const directs = await stakingContract.getDirectRefs(account).catch(() => []);
       directCount = directs.length;
       for (const d of directs) {
-        const dInfo = await stakingContract.users(d).catch(()=>null);
+        const dInfo = await stakingContract.users(d).catch(() => null);
         const st = dInfo ? fromUnits(dInfo[1]) : 0;
         teamBusiness += st;
-        if (st > 0) active++; else inactive++;
-        const subs = await stakingContract.getDirectRefs(d).catch(()=>[]);
+        if (st > 0) active++;
+        else inactive++;
+        const subs = await stakingContract.getDirectRefs(d).catch(() => []);
         indirectCount += subs.length;
         for (const s of subs) {
-          const sInfo = await stakingContract.users(s).catch(()=>null);
+          const sInfo = await stakingContract.users(s).catch(() => null);
           teamBusiness += sInfo ? fromUnits(sInfo[1]) : 0;
         }
       }
@@ -533,17 +551,31 @@ async function refreshAll(){
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
-    document.getElementById("teamBusiness") && (document.getElementById("teamBusiness").innerText = `${toFixedNumber(teamBusiness,6)} USDT`);
+    document.getElementById("teamBusiness") &&
+      (document.getElementById("teamBusiness").innerText = `${toFixedNumber(teamBusiness, 6)} USDT`);
 
-    // level unlock UI
+    // 🪜 Level unlock UI
     const rows = document.querySelectorAll("#levelsTbody tr");
-    rows.forEach((r,i) => {
+    rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
       if (!cell) return;
-      if (i < Math.min(directCount,10)) {
-        cell.innerText = "Open ✅"; cell.style.color = "#00FF90"; cell.style.fontWeight = "600";
-      } else { cell.innerText = "Pending"; cell.style.color = ""; cell.style.fontWeight = ""; }
+      if (i < Math.min(directCount, 10)) {
+        cell.innerText = "Open ✅";
+        cell.style.color = "#00FF90";
+        cell.style.fontWeight = "600";
+      } else {
+        cell.innerText = "Pending";
+        cell.style.color = "";
+        cell.style.fontWeight = "";
+      }
     });
+
+    // 🚀 Start live ROI update animation
+    const dailyRoiBps = Number(await stakingContract.dailyROIbps());
+    startLiveROIAnimation(roiPending, staked, dailyRoiBps);
+
+    // 🎯 Update 3x progress bar
+    updateProgressBar(staked, staked * 3, totalEarned);
 
   } catch (e) {
     console.error("refreshAll error:", e);
