@@ -500,6 +500,7 @@ async function sumLevelEventsFor(accountAddr) {
 }
 
 /* ==================== REFRESH ALL (main) ==================== */
+/* ==================== REFRESH ALL (main) ==================== */
 async function refreshAll() {
   if (!stakingContract || !account) return;
   try {
@@ -510,40 +511,78 @@ async function refreshAll() {
       `${account} — ${toFixedNumber(walletBal, 6)} USDT`;
 
     // === USER INFO ===
-    const info = await stakingContract.getUserInfo(account);
-    const staked = fromUnits(info.staked || 0);
-    const roiPending = fromUnits(info.pending || 0);
-    const incomeBal = fromUnits(info.incomeBal || 0);
-    const totalEarned = fromUnits(info.totalEarned || 0);
+    const info = await stakingContract.users(account);
 
-    // === DIRECTS ===
+    const staked = fromUnits(info.totalStake || 0);
+    const roiPending = fromUnits(info.roiIncome || 0);
+    const instantIncome = fromUnits(info.instantIncome || 0);
+    const levelIncome = fromUnits(info.levelIncome || 0);
+    const totalEarned = fromUnits(info.totalEarned || 0);
+    const isActive = info.isActive || false;
+
+    document.getElementById("pkgStatus").innerText = isActive ? "Active ✅" : "Inactive ❌";
+
+    // === DAYS TO 3x ===
+    let daysLeft = 0;
+    try {
+      const res = await stakingContract.getTimeTo3x(account);
+      daysLeft = Number(res || 0);
+    } catch (err) {
+      console.warn("getTimeTo3x error (fallback to 0)", err);
+    }
+
+    document.getElementById("stakedDisplay").innerText =
+      toFixedNumber(staked, 6) + " USDT";
+    document.getElementById("targetDisplay").innerText =
+      toFixedNumber(staked * 3, 6) + " USDT";
+    document.getElementById("days3x").innerText = daysLeft + " days";
+
+    // === INCOME SUMMARY ===
+    document.getElementById("instantIncome").innerText =
+      toFixedNumber(instantIncome, 6) + " USDT";
+    document.getElementById("levelIncome").innerText =
+      toFixedNumber(levelIncome, 6) + " USDT";
+    document.getElementById("roiPending").innerText =
+      toFixedNumber(roiPending, 6) + " USDT";
+
+    // === TOTAL WALLET CALCULATION ===
+    const totalWallet =
+      instantIncome + levelIncome + roiPending;
+    document.getElementById("totalWallet").innerText =
+      toFixedNumber(totalWallet, 6) + " USDT";
+
+    // === TEAM DATA ===
     const directs = await stakingContract.getDirectRefs(account);
     const directCount = directs.length;
 
-    // === TEAM BUSINESS + INDIRECTS ===
     let teamBusiness = 0;
     let indirectCount = 0;
+
     for (const d of directs) {
-      const dInfo = await stakingContract.getUserInfo(d);
-      teamBusiness += fromUnits(dInfo.staked || 0);
+      const dInfo = await stakingContract.users(d);
+      teamBusiness += fromUnits(dInfo.totalStake || 0);
+
       const subs = await stakingContract.getDirectRefs(d);
       indirectCount += subs.length;
       for (const s of subs) {
-        const sInfo = await stakingContract.getUserInfo(s);
-        teamBusiness += fromUnits(sInfo.staked || 0);
+        const sInfo = await stakingContract.users(s);
+        teamBusiness += fromUnits(sInfo.totalStake || 0);
       }
     }
+
     document.getElementById("teamBusiness").innerText =
       toFixedNumber(teamBusiness, 6) + " USDT";
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
 
     // === ACTIVE / INACTIVE ===
-    let active = 0, inactive = 0;
+    let active = 0,
+      inactive = 0;
     for (const d of directs) {
-      const dInfo = await stakingContract.getUserInfo(d);
-      const st = fromUnits(dInfo.staked || 0);
-      if (st > 0) active++; else inactive++;
+      const dInfo = await stakingContract.users(d);
+      const st = fromUnits(dInfo.totalStake || 0);
+      if (st > 0) active++;
+      else inactive++;
     }
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
@@ -563,213 +602,130 @@ async function refreshAll() {
       }
     });
 
-    // === WITHDRAW DEDUCTIONS ===
-    let totalWithdrawed = 0;
-    try {
-      const countBn = await stakingContract.withdrawRequestsCount();
-      const count = Number(countBn || 0);
-      for (let i = 1; i <= count; i++) {
-        const req = await stakingContract.getWithdrawRequest(i);
-        if (req.user && req.user.toLowerCase() === account.toLowerCase()) {
-          if (req.status === 0 || req.status === 1)
-            totalWithdrawed += fromUnits(req.amount || 0);
-        }
-      }
-    } catch (err) { console.warn("Withdraw check error", err); }
-
-// === INCOME SPLIT (FINAL FIXED) ===
-let instantIncome = 0;
-let levelIncome = 0;
-let totalWallet = 0;
-
-try {
-  // 🔹 Step 1: Calculate instant income (10% of all directs' total stake)
-  if (directs.length > 0) {
-    const directInfos = await Promise.all(
-      directs.map(d => stakingContract.getUserInfo(d).catch(() => null))
-    );
-    for (const info of directInfos) {
-      if (info) {
-        const st = fromUnits(info.staked || 0);
-        instantIncome += st * 0.10; // 10% of each direct's stake
-      }
-    }
-  }
-
-  // 🔹 Step 2: Level income = incomeBalance - instantIncome
-  levelIncome = incomeBal - instantIncome;
-  if (levelIncome < 0) levelIncome = 0;
-
-  // 🔹 Step 3: Total wallet = instant + level + ROI pending - all withdrawals
-  totalWallet = instantIncome + levelIncome + roiPending - totalWithdrawed;
-  if (totalWallet < 0) totalWallet = 0;
-
-  // 🔹 Step 4: Update UI (safe with fallback)
-  document.getElementById("instantIncome").innerText =
-    toFixedNumber(instantIncome, 6) + " USDT";
-
-  document.getElementById("levelIncome").innerText =
-    toFixedNumber(levelIncome, 6) + " USDT";
-
-  document.getElementById("roiPending").innerText =
-    toFixedNumber(roiPending, 6) + " USDT";
-
-  document.getElementById("totalWallet").innerText =
-    toFixedNumber(totalWallet, 6) + " USDT";
-
-  console.log("✅ Income Debug → Instant:", instantIncome.toFixed(3),
-              "Level:", levelIncome.toFixed(3),
-              "ROI:", roiPending.toFixed(3),
-              "Withdrawn:", totalWithdrawed.toFixed(3),
-              "TotalWallet:", totalWallet.toFixed(3));
-
-} catch (err) {
-  console.error("Income calc error:", err);
-}
-
-
-    // === STAKING INFO ===
-    const dailyRate = 0.01;
-    let daysTo3x = 0;
-    if (staked > 0) {
-      const dailyReward = staked * dailyRate;
-      const already = totalEarned + roiPending + incomeBal;
-      const remaining = Math.max(staked * 3 - already, 0);
-      daysTo3x = dailyReward > 0 ? Math.ceil(remaining / dailyReward) : 0;
-    }
-    document.getElementById("stakedDisplay").innerText =
-      toFixedNumber(staked, 6) + " USDT";
-    document.getElementById("targetDisplay").innerText =
-      toFixedNumber(staked * 3, 6) + " USDT";
-    document.getElementById("days3x").innerText = daysTo3x + " days";
-    document.getElementById("pkgStatus").innerText =
-      staked > 0 ? "Active" : "Inactive";
-
-    // === HISTORY + TEAM TABLE ===
-    await loadWithdrawHistory();
-    await loadTeamInfo();
-
-    // === DEBUG LOG ===
-    console.log(
-      `✅ Refresh Done:
-Direct Business = ${directBusiness.toFixed(2)}
-Instant Income = ${instantIncome.toFixed(2)}
-Level Income = ${levelIncome.toFixed(2)}
-ROI Pending = ${roiPending.toFixed(2)}
-Withdrawn = ${totalWithdrawed.toFixed(2)}
-Total Wallet = ${totalWallet.toFixed(2)}`
-    );
-
+    console.log("✅ Refresh done:", {
+      staked,
+      roiPending,
+      instantIncome,
+      levelIncome,
+      totalEarned,
+      teamBusiness,
+      daysLeft,
+    });
   } catch (err) {
     console.error("refreshAll error:", err);
   }
 }
 
-
+/* ===================== STAKE FUNCTION ===================== */
 async function stake() {
+  if (!stakingContract || !tokenContract || !account) {
+    return alert("⚠️ Please connect your wallet first.");
+  }
+
+  const amount = document.getElementById("stakeAmt").value;
+  const ref = new URLSearchParams(window.location.search).get("ref") || ethers.ZeroAddress;
+
+  if (!amount || Number(amount) < 20) {
+    return alert("⚠️ Minimum stake is 20 USDT.");
+  }
+
   try {
-    if (!stakingContract || !signer) {
-      alert("Connect wallet first");
-      return;
-    }
+    const units = toUnits(amount);
 
-    const amtStr = document.getElementById("stakeAmount").value;
-    if (!amtStr || Number(amtStr) <= 0) {
-      alert("Enter stake amount");
-      return;
-    }
-
-    const amt = Number(amtStr);
-    if (amt < 20 || amt % 20 !== 0) {
-      alert("Stake must be at least 20 USDT and multiple of 20");
-      return;
-    }
-
-    const units = ethers.utils.parseUnits(amt.toString(), TOKEN_DECIMALS);
-
-    // ✅ STEP 1: Safely claim old ROI before staking
+    // 🔹 Check if user is registered or not
+    let isRegistered = false;
     try {
-      const info = await stakingContract.getUserInfo(account);
-      const pendingROI = Number(ethers.utils.formatUnits(info.pending || 0, TOKEN_DECIMALS));
-      if (pendingROI > 0) {
-        console.log("⏳ Claiming old ROI before new stake...");
-        const txClaim = await stakingContract.claimRewards();
-        await txClaim.wait();
-        console.log("✅ Old ROI claimed successfully.");
-        await new Promise((r) => setTimeout(r, 1500)); // 1.5s delay to confirm timestamp
-      } else {
-        console.log("No pending ROI, skipping claim step.");
-      }
-    } catch (claimErr) {
-      console.warn("Claim skipped or failed (safe to ignore):", claimErr);
+      isRegistered = await stakingContract.registered(account);
+    } catch (e) {
+      console.warn("Registered check failed:", e);
     }
 
-    // ✅ STEP 2: Resolve referral
-    let ref = localStorage.getItem("staking_ref") || new URLSearchParams(window.location.search).get("ref");
-    if (!ref || !ethers.utils.isAddress(ref)) {
-      try {
-        ref = await stakingContract.owner();
-      } catch {
-        ref = ethers.constants.AddressZero;
-      }
+    // 🔹 Auto-register if not yet registered
+    if (!isRegistered) {
+      alert("🔄 Registering your account...");
+      const regTx = await stakingContract.register(ref);
+      await regTx.wait();
+      alert("✅ Registration successful!");
     }
 
-    // ✅ STEP 3: Execute deposit (new stake)
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Processing...";
-    btn.disabled = true;
+    // 🔹 Approve Token if needed
+    const allowance = await tokenContract.allowance(account, STAKING_ADDRESS);
+    if (allowance < units) {
+      alert("🔹 Approving token spending...");
+      const approveTx = await tokenContract.approve(STAKING_ADDRESS, ethers.MaxUint256);
+      await approveTx.wait();
+      alert("✅ Token approved successfully!");
+    }
 
-   const tx = await stakingContract.stake(units, ref);
-
-    console.log("🚀 New stake transaction sent...");
+    // 🔹 Perform Staking
+    alert("🚀 Staking in progress...");
+    const tx = await stakingContract.stake(units, ref);
     await tx.wait();
 
-    alert("✅ Stake successful — old ROI preserved!");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
-
+    alert("✅ Staking successful!");
     await refreshAll();
-  } catch (e) {
-    console.error("stake error", e);
-    alert("Stake failed: " + (e?.data?.message || e?.message || e));
-    const btn = document.getElementById("stakeBtn");
-    btn.innerText = "Stake Now";
-    btn.disabled = false;
+  } catch (err) {
+    console.error("Stake failed:", err);
+    alert("❌ Stake failed: " + (err.message || "Unknown error"));
   }
 }
 
-// 🟢 P2P Stake Function
-document.getElementById("p2pStakeBtn").addEventListener("click", async () => {
+/* ===================== STAKE FOR (P2P) ===================== */
+async function stakeFor() {
+  if (!stakingContract || !tokenContract || !account) {
+    return alert("⚠️ Please connect your wallet first.");
+  }
+
+  const amount = document.getElementById("p2pAmount").value;
+  const refUser = document.getElementById("p2pAddress").value;
+
+  if (!refUser || !ethers.isAddress(refUser)) {
+    return alert("⚠️ Enter a valid wallet address to stake for.");
+  }
+  if (!amount || Number(amount) < 20) {
+    return alert("⚠️ Minimum stake for P2P is 20 USDT.");
+  }
+
   try {
-    if (!stakingContract || !signer) { alert("Connect wallet first"); return; }
-    const addr = document.getElementById("p2pAddress").value.trim();
-    const amtStr = document.getElementById("stakeAmount").value;
-    if (!ethers.utils.isAddress(addr)) { alert("Enter valid wallet address"); return; }
-    if (!amtStr || Number(amtStr) < 20) { alert("Minimum stake 20 USDT"); return; }
+    const units = toUnits(amount);
 
-    const amtUnits = ethers.utils.parseUnits(amtStr.toString(), TOKEN_DECIMALS);
-    const ownerAddr = await stakingContract.owner();
+    // 🔹 Check if refUser is registered or not
+    let isRefRegistered = false;
+    try {
+      isRefRegistered = await stakingContract.registered(refUser);
+    } catch (e) {
+      console.warn("Ref user check failed:", e);
+    }
 
-    const btn = document.getElementById("p2pStakeBtn");
-    btn.innerText = "Processing...";
-    btn.disabled = true;
+    // 🔹 Auto-register if not yet registered
+    if (!isRefRegistered) {
+      alert("🔄 Registering P2P user...");
+      const regTx = await stakingContract.register(ethers.ZeroAddress);
+      await regTx.wait();
+      alert("✅ P2P user registered!");
+    }
 
-    const tx = await stakingContract.stakeFor(addr, amtUnits, ownerAddr);
+    // 🔹 Approve Token if needed
+    const allowance = await tokenContract.allowance(account, STAKING_ADDRESS);
+    if (allowance < units) {
+      alert("🔹 Approving token spending...");
+      const approveTx = await tokenContract.approve(STAKING_ADDRESS, ethers.MaxUint256);
+      await approveTx.wait();
+      alert("✅ Token approved successfully!");
+    }
+
+    // 🔹 Perform P2P Stake
+    alert("🚀 P2P staking in progress...");
+    const tx = await stakingContract.stakeFor(refUser, units, ethers.ZeroAddress);
     await tx.wait();
 
-    alert("✅ P2P Stake successful!");
-    btn.innerText = "Stake For (P2P)";
-    btn.disabled = false;
-
+    alert("✅ P2P staking successful!");
     await refreshAll();
-  } catch (e) {
-    console.error("P2P Stake error:", e);
-    alert("StakeFor failed: " + (e?.data?.message || e?.message || e));
-    const btn = document.getElementById("p2pStakeBtn");
-    btn.innerText = "Stake For (P2P)";
-    btn.disabled = false;
+  } catch (err) {
+    console.error("P2P stake failed:", err);
+    alert("❌ P2P stake failed: " + (err.message || "Unknown error"));
   }
-});
+}
 
 async function claim() {
   try {
