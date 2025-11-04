@@ -160,7 +160,6 @@
 
   </div>
 </main>
-
 <div class="card">
   <h3>Withdrawal History (Requests & Approved)</h3>
   <div class="history-table">
@@ -170,7 +169,6 @@
     </table>
   </div>
 </div>
-
 <footer>Made with ❤️ — Testnet only while testing</footer>
 
 <!-- ========== JS: Full logic ========== -->
@@ -515,6 +513,26 @@ async function ensureRegistered(referrerAddr) {
     await tx.wait();
     return true;
   } catch (e) { console.warn("ensureRegistered failed:", e); return false; }
+}
+// ✅ Withdraw history
+async function loadWithdrawHistory() {
+  const tbody = document.getElementById('withdrawHistoryBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="center muted">Loading...</td></tr>';
+  if (!stakingContract || !account) return;
+  try {
+    let total = Number(await stakingContract.nextWithdrawId().catch(()=>0));
+    tbody.innerHTML = '';
+    for (let i = total; i > 0; i--) {
+      const req = await stakingContract.withdrawals(i).catch(()=>null);
+      if (!req || !req.user || req.user.toLowerCase() !== account.toLowerCase()) continue;
+      const time = new Date(Number(req.timestamp)*1000).toLocaleString();
+      const amount = fromUnits(req.amount);
+      const status = req.approved ? "✅" : "⏳";
+      tbody.innerHTML += `<tr><td>${time}</td><td>${amount}</td><td>${status}</td><td>-</td></tr>`;
+    }
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="4" class="center muted">Error</td></tr>';
+  }
 }
 
 /* ======= utility: attach accounts/chain change to reload UI ======= */
