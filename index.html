@@ -472,8 +472,9 @@ async function updateROIIfNeeded() {
       console.log("ROI already updated recently ⏳");
     }
   } catch (err) {
-    console.warn("ROI auto-update failed:", err);
+    console.warn("⚠️ ROI auto-update failed:", err);
   }
+  return;
 }
 
 /* ======= REFRESH ALL: populates UI ======= */
