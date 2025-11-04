@@ -719,7 +719,8 @@ async function stake() {
     btn.innerText = "Processing...";
     btn.disabled = true;
 
-    const tx = await stakingContract.deposit(units, ref);
+   const tx = await stakingContract.stake(units, ref);
+
     console.log("🚀 New stake transaction sent...");
     await tx.wait();
 
