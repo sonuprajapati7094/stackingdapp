@@ -55,15 +55,25 @@ Index.html Github Old code<!DOCTYPE html>
       <div class="sm" style="margin-top:10px;">Tip: Approve once (Quick Approve) then stake.</div>
     </div>
 
-  <div style="margin-top:10px;">
-        <input id="p2pAddress" type="text" placeholder="Stake for wallet address" />
-        <button class="accent-btn" id="p2pStakeBtn">Stake For (P2P)</button>
-        <div class="muted" style="margin-top:5px;">Stake for other wallet (no 5% fee)</div>
-      </div>
+    <input id="stakeAmt" type="number" placeholder="Enter amount (min 20)" class="form-control" style="width:100%;margin-top:8px;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;">
 
-      <div class="muted" style="margin-top:10px;">Tip: Approve once, then stake.</div>
-    </div>
-    <div class="card">
+  <button id="approveBtn" class="btn btn-warning">Quick Approve</button>
+  <button id="stakeBtn" class="btn btn-success">Stake Now</button>
+</div>
+
+
+<!-- ========== P2P STAKE SECTION ========== -->
+<div class="card" style="margin-top:20px;">
+  <h3>Stake For (P2P)</h3>
+  <p>Stake for another wallet (No 5% fee)</p>
+
+  <!-- P2P inputs -->
+  <input id="p2pAmount" type="number" placeholder="P2P stake amount (min 20)" class="form-control" style="width:100%;margin-top:8px;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;">
+  <input id="p2pAddress" type="text" placeholder="Wallet address for P2P" class="form-control" style="width:100%;margin-top:8px;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;">
+
+  <button id="stakeForBtn" class="btn btn-success">Stake For (P2P)</button>
+</div>
+
       <h2>Your Referral Link</h2>
       <input id="referralInput" type="text" readonly />
       <div style="display:flex;gap:8px;margin-top:8px">
