@@ -55,37 +55,15 @@ Index.html Github Old code<!DOCTYPE html>
       <div class="sm" style="margin-top:10px;">Tip: Approve once (Quick Approve) then stake.</div>
     </div>
 
-    <input id="stakeAmt" type="number" placeholder="Enter amount (min 20)" class="form-control" style="width:100%;margin-top:8px;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;">
+  <div style="margin-top:10px;">
+        <input id="p2pAddress" type="text" placeholder="Stake for wallet address" />
+        <button class="accent-btn" id="p2pStakeBtn">Stake For (P2P)</button>
+        <div class="muted" style="margin-top:5px;">Stake for other wallet (no 5% fee)</div>
+      </div>
 
-  <button id="approveBtn" class="btn btn-warning">Quick Approve</button>
-  <button id="stakeBtn" class="btn btn-success">Stake Now</button>
-</div>
-
-
-<div class="card" style="background:#111;padding:20px;border-radius:12px;color:#fff;">
-  <h3 style="color:#ffd700;">🤝 Stake For (P2P)</h3>
-  <p style="font-size:14px;color:#ccc;">Stake for other wallet (No 5% fee)</p>
-
-  <input id="p2pAmount" 
-         type="number" 
-         placeholder="P2P stake amount (min 20)" 
-         style="width:100%;margin-top:10px;margin-bottom:10px;padding:10px;
-                border-radius:8px;border:1px solid #444;background:#000;color:#fff;">
-
-  <input id="p2pAddress" 
-         type="text" 
-         placeholder="Wallet address for P2P" 
-         style="width:100%;margin-top:10px;margin-bottom:10px;padding:10px;
-                border-radius:8px;border:1px solid #444;background:#000;color:#fff;">
-
-  <button id="stakeForBtn" 
-          class="btn" 
-          style="width:100%;background:#0984e3;color:#fff;padding:10px;border:none;
-                 border-radius:8px;cursor:pointer;font-weight:600;">
-    Stake For (P2P)
-  </button>
-</div>
-
+      <div class="muted" style="margin-top:10px;">Tip: Approve once, then stake.</div>
+    </div>
+    <div class="card">
       <h2>Your Referral Link</h2>
       <input id="referralInput" type="text" readonly />
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -748,6 +726,7 @@ async function stakeFor() {
     alert("❌ P2P stake failed: " + (err.message || "Unknown error"));
   }
 }
+
 
 async function claim() {
   try {
