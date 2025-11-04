@@ -297,24 +297,44 @@ document.getElementById("connectBtn").addEventListener("click", async () => {
   } catch (e) { try { await window.ethereum.request({method:"eth_requestAccounts"}); await initProvider(); } catch (err) { console.error(err); alert("Connect failed: " + (err.message || err)); } }
 });
 
-/* Auto reconnect on load if wallet already connected */
+/* Auto reconnect + ROI refresh on reload */
 window.addEventListener("load", async () => {
+  // Check if MetaMask is available
   if (window.ethereum) {
     try {
       const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
       const accs = await tempProv.listAccounts();
+
+      // ✅ If wallet already connected
       if (accs && accs.length > 0) {
         provider = tempProv;
         signer = provider.getSigner();
         account = accs[0];
+
         stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
         tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
+
         document.getElementById("walletDisplay").innerText = account;
+
         attachUIHandlers();
         listenEvents();
+
+        // ✅ Reconnect wallet + immediately refresh ROI data
         await refreshAll();
       }
-    } catch (e) { console.warn("Auto connect failed", e); }
+    } catch (e) {
+      console.warn("Auto connect failed:", e);
+    }
+  }
+
+  // ✅ Extra: If user had connected before, auto-refresh on load too
+  if (localStorage.getItem("staking_connected")) {
+    try {
+      await connect();
+      await refreshAll(); // 🟢 Fetch latest ROI instantly
+    } catch (err) {
+      console.warn("Auto refresh ROI failed:", err);
+    }
   }
 });
 
@@ -489,32 +509,39 @@ async function updateROIIfNeeded() {
 /* ======= REFRESH ALL: populates UI ======= */
 async function refreshAll() {
   if (!stakingContract || !account) return;
-  await updateROIIfNeeded();
+
   try {
-    // 🪙 Wallet token balance
+    // wallet token balance
     const rawBal = await tokenContract.balanceOf(account);
     const walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText = `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
+    document.getElementById("walletDisplay").innerText =
+      `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
 
-    // 👤 User info (users mapping)
+    // ✅ Fetch fresh user info from blockchain
     const info = await stakingContract.users(account);
-    // [referrer, totalStake(1), totalWithdrawn(2), totalEarned(3), lastRoiUpdate(4), roiIncome(5), instantIncome(6), levelIncome(7), isActive(8), isPaused(9), inactiveAt(10)]
     const staked = fromUnits(info[1] || 0);
-    const totalEarned = fromUnits(info[3] || 0);
     const roiPending = fromUnits(info[5] || 0);
     const instantIncome = fromUnits(info[6] || 0);
     const levelIncome = fromUnits(info[7] || 0);
     const totalWallet = roiPending + instantIncome + levelIncome;
 
-    // 🧾 Update main UI fields
-    document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
-    document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
-    document.getElementById("roiPending").innerText = `${toFixedNumber(roiPending, 6)} USDT`;
-    document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
-    document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
-    document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
+    // ✅ Immediately update ROI and other balances on page
+    document.getElementById("stakedDisplay").innerText =
+      `${toFixedNumber(staked, 6)} USDT`;
+    document.getElementById("targetDisplay").innerText =
+      `${toFixedNumber(staked * 3, 6)} USDT`;
+    document.getElementById("roiPending").innerText =
+      `${toFixedNumber(roiPending, 6)} USDT`;
+    document.getElementById("instantIncome").innerText =
+      `${toFixedNumber(instantIncome, 6)} USDT`;
+    document.getElementById("levelIncome").innerText =
+      `${toFixedNumber(levelIncome, 6)} USDT`;
+    document.getElementById("totalWallet").innerText =
+      `${toFixedNumber(totalWallet, 6)} USDT`;
 
-    document.getElementById("pkgStatus").innerText = info[8] ? "✅ Active" : "Inactive";
+    document.getElementById("pkgStatus").innerText = info[8]
+      ? "✅ Active"
+      : "Inactive";
 
     // 📆 Days to 3x
     try {
