@@ -343,17 +343,7 @@ function attachHandlers(){
 function listenEvents(){
   stakingContract.on("Staked",()=>refreshAll());
   stakingContract.on("WithdrawalRequested",()=>refreshAll());
-stakingContract.on("Registered", (user, ref) => {
-  // if ref matches our account, refresh team (safety: run async)
-  try {
-    if (ref && account && ref.toLowerCase() === account.toLowerCase()) {
-      loadTeamInfo().catch(()=>{});
-    } else {
-      // some other registration may still affect counts, refresh anyway
-      loadTeamInfo().catch(()=>{});
-    }
-  } catch(e){ /* ignore */ }
-});
+  stakingContract.on("Registered",()=>refreshAll());
 }
 
 /* ---------- ROI + DASH ---------- */
