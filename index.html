@@ -332,10 +332,7 @@ function attachHandlers(){
   };
 
   document.getElementById("refreshBtn").onclick=refreshAll;
-  document.getElementById("showTeam").onclick = async () => {
-  await loadTeamInfo();
-  alert("Team data refreshed (see UI)");
-};
+  document.getElementById("showTeam").onclick=loadTeamInfo;
   document.getElementById("copyLink").onclick=async()=>{
     await navigator.clipboard.writeText(document.getElementById("refLink").value);
     alert("Link copied!");
@@ -387,63 +384,51 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Event-based, no contract edit required) ======= */
+/* ======= loadTeamInfo (Local Cache Version - Works Without RPC Logs) ======= */
 async function loadTeamInfo() {
   try {
-    if (!stakingContract || !provider || !account) return;
+    if (!account) return;
 
-    console.log("🔍 Loading team info via events...");
+    console.log("🔍 Loading team info from local cache...");
 
-    // --- STEP 1: get Registered events where referrer = current user ---
-    const iface = new ethers.utils.Interface(STAKING_ABI);
-    const topic = iface.getEventTopic("Registered");
-    const refTopic = ethers.utils.hexZeroPad(account, 32);
+    // Local storage key
+    const key = "team_" + account.toLowerCase();
+    let teamData = JSON.parse(localStorage.getItem(key) || "[]");
 
-    // 🧩 provider.getLogs: fetch last 100k blocks (safe range)
-    const latestBlock = await provider.getBlockNumber();
-    const fromBlock = latestBlock - 100000; // adjust as needed (100k = ~2 weeks)
-    const logs = await provider.getLogs({
-      address: CONFIG.stakingAddress,
-      fromBlock: fromBlock > 0 ? fromBlock : 0,
-      toBlock: "latest",
-      topics: [topic, null, refTopic]
-    });
-
-    const directs = logs.map(log => iface.parseLog(log).args.user);
-    const directCount = directs.length;
-
-    // --- STEP 2: For each direct, check if active and count indirects ---
-    let indirectCount = 0;
-    let active = 0;
-    let inactive = 0;
-
-    for (const d of directs) {
-      try {
-        const info = await stakingContract.users(d).catch(() => null);
-        const staked = fromUnits(info?.totalStake || 0);
-        if (staked > 0) active++; else inactive++;
-
-        // find indirects (their directs)
-        const topic2 = iface.getEventTopic("Registered");
-        const refTopic2 = ethers.utils.hexZeroPad(d, 32);
-        const logs2 = await provider.getLogs({
-          address: CONFIG.stakingAddress,
-          fromBlock,
-          toBlock: "latest",
-          topics: [topic2, null, refTopic2]
-        });
-        indirectCount += logs2.length;
-      } catch (err) {
-        console.warn("Direct user fetch failed:", err);
-      }
+    // Add live Registered events (listen once)
+    if (stakingContract && !window._teamListenerAdded) {
+      window._teamListenerAdded = true;
+      stakingContract.on("Registered", (user, ref) => {
+        if (ref.toLowerCase() === account.toLowerCase()) {
+          console.log("🆕 New direct joined:", user);
+          if (!teamData.includes(user)) {
+            teamData.push(user);
+            localStorage.setItem(key, JSON.stringify(teamData));
+            loadTeamInfo(); // refresh
+          }
+        }
+      });
     }
 
-    // --- STEP 3: update UI ---
+    const directs = teamData || [];
+    const directCount = directs.length;
+    let active = 0, inactive = 0, indirectCount = 0;
+
+    // Check active/inactive (simple)
+    for (const d of directs) {
+      try {
+        const info = await stakingContract.users(d).catch(()=>null);
+        const st = fromUnits(info?.totalStake || 0);
+        if (st > 0) active++; else inactive++;
+      } catch {}
+    }
+
+    // Update UI
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // --- STEP 4: update level table ---
+    // Level unlock
     const rows = document.querySelectorAll("#levelsTbody tr");
     rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
@@ -459,7 +444,7 @@ async function loadTeamInfo() {
       }
     });
 
-    console.log(`✅ Loaded Team — Directs: ${directCount}, Indirects: ${indirectCount}, Active: ${active}`);
+    console.log(`✅ Team loaded from local cache (${directCount} directs)`);
 
   } catch (e) {
     console.error("⚠️ loadTeamInfo error:", e);
