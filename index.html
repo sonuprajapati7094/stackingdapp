@@ -590,11 +590,8 @@ async function refreshAll() {
         cell.style.color = "";
         cell.style.fontWeight = "";
       }
-    });
+    })
 
-    // 🚀 Start live ROI update animation
-    const dailyRoiBps = Number(await stakingContract.dailyROIbps());
-    startLiveROIAnimation(roiPending, staked, dailyRoiBps);
 
     // 🎯 Update 3x progress bar
     updateProgressBar(staked, staked * 3, totalEarned);
