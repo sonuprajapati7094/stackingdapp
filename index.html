@@ -384,63 +384,63 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Direct Array Version - No Logs, No RPC Error) ======= */
+/* ======= loadTeamInfo (Event-based, no contract edit required) ======= */
 async function loadTeamInfo() {
   try {
-    if (!stakingContract || !account) return;
+    if (!stakingContract || !provider || !account) return;
 
-    // Try to read directs[] array from user mapping
-    let directCount = 0;
+    console.log("🔍 Loading team info via events...");
+
+    // --- STEP 1: get Registered events where referrer = current user ---
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const topic = iface.getEventTopic("Registered");
+    const refTopic = ethers.utils.hexZeroPad(account, 32);
+
+    // 🧩 provider.getLogs: fetch last 100k blocks (safe range)
+    const latestBlock = await provider.getBlockNumber();
+    const fromBlock = latestBlock - 100000; // adjust as needed (100k = ~2 weeks)
+    const logs = await provider.getLogs({
+      address: CONFIG.stakingAddress,
+      fromBlock: fromBlock > 0 ? fromBlock : 0,
+      toBlock: "latest",
+      topics: [topic, null, refTopic]
+    });
+
+    const directs = logs.map(log => iface.parseLog(log).args.user);
+    const directCount = directs.length;
+
+    // --- STEP 2: For each direct, check if active and count indirects ---
     let indirectCount = 0;
-    let active = 0, inactive = 0;
+    let active = 0;
+    let inactive = 0;
 
-    // Step 1: read current user data (to access directs[])
-    const userInfo = await stakingContract.users(account).catch(() => null);
-    if (!userInfo) return;
-
-    // Step 2: read direct addresses (contract ke andar "directs" public hai to access hoga)
-    let directs = [];
-    try {
-      // contract me directly array ka getter hota hai users(account).directs(index)
-      // to hum loop karke length find kar lenge
-      for (let i = 0; i < 100; i++) {
-        try {
-          const addr = await stakingContract.users(account).directs(i);
-          if (!addr || addr === ethers.constants.AddressZero) break;
-          directs.push(addr);
-        } catch {
-          break;
-        }
-      }
-    } catch (err) {
-      console.warn("Direct array read failed:", err);
-    }
-
-    directCount = directs.length;
-
-    // Step 3: count active/inactive + second-level team
     for (const d of directs) {
-      const dInfo = await stakingContract.users(d).catch(()=>null);
-      if (dInfo) {
-        const st = fromUnits(dInfo.totalStake || dInfo[1]);
-        if (st > 0) active++; else inactive++;
-      }
-      // find 2nd level (optional)
       try {
-        for (let j = 0; j < 50; j++) {
-          const sub = await stakingContract.users(d).directs(j);
-          if (!sub || sub === ethers.constants.AddressZero) break;
-          indirectCount++;
-        }
-      } catch {}
+        const info = await stakingContract.users(d).catch(() => null);
+        const staked = fromUnits(info?.totalStake || 0);
+        if (staked > 0) active++; else inactive++;
+
+        // find indirects (their directs)
+        const topic2 = iface.getEventTopic("Registered");
+        const refTopic2 = ethers.utils.hexZeroPad(d, 32);
+        const logs2 = await provider.getLogs({
+          address: CONFIG.stakingAddress,
+          fromBlock,
+          toBlock: "latest",
+          topics: [topic2, null, refTopic2]
+        });
+        indirectCount += logs2.length;
+      } catch (err) {
+        console.warn("Direct user fetch failed:", err);
+      }
     }
 
-    // Step 4: update UI
+    // --- STEP 3: update UI ---
     document.getElementById("directCount").innerText = directCount;
     document.getElementById("indirectCount").innerText = indirectCount;
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // Step 5: update levels table
+    // --- STEP 4: update level table ---
     const rows = document.querySelectorAll("#levelsTbody tr");
     rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
@@ -456,15 +456,15 @@ async function loadTeamInfo() {
       }
     });
 
+    console.log(`✅ Loaded Team — Directs: ${directCount}, Indirects: ${indirectCount}, Active: ${active}`);
+
   } catch (e) {
-    console.error("loadTeamInfo error:", e);
+    console.error("⚠️ loadTeamInfo error:", e);
     document.getElementById("directCount").innerText = "0";
     document.getElementById("indirectCount").innerText = "0";
     document.getElementById("activeCounts").innerText = "0 / 0";
   }
 }
-
-
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
   const tb=document.getElementById("withdrawHistoryBody");
