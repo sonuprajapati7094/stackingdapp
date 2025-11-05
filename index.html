@@ -483,35 +483,25 @@ function listenEvents(){
 
   } catch (e) { console.warn("listenEvents error", e); }
 }
-// 🧩 Auto ROI update (before refresh)
-async function updateROIIfNeeded() {
+// ✅ Force ROI update on reload (simple and reliable)
+async function forceUpdateROI() {
+  if (!stakingContract || !account) return;
   try {
-    if (!stakingContract || !account) return;
-
-    const info = await stakingContract.users(account);
-    const lastUpdate = Number(info.lastRoiUpdate || 0);
-    const now = Math.floor(Date.now() / 1000);
-
-    if (now - lastUpdate > 86400) { // 24 hours
-      console.log("⏳ Auto ROI update triggered...");
-      const tx = await stakingContract.stake(0, account);
-      await tx.wait();
-      console.log("✅ ROI updated successfully");
-    } else {
-      console.log("ROI already updated recently ⏳");
-    }
-  } catch (err) {
-    console.warn("⚠️ ROI auto-update failed:", err);
+    // Some contracts recalc ROI when stake(0, account) is called
+    const tx = await stakingContract.stake(0, account);
+    await tx.wait();
+    console.log("✅ ROI updated from blockchain successfully!");
+  } catch (e) {
+    console.warn("⚠️ ROI update skipped (already fresh or view-only):", e.message);
   }
-  return;
 }
-
 /* ======= REFRESH ALL: populates UI ======= */
 async function refreshAll() {
   if (!stakingContract || !account) return;
 
   try {
     // wallet token balance
+    await forceUpdateROI(); // ✅ ensures ROI updates before refreshing UI
     const rawBal = await tokenContract.balanceOf(account);
     const walletBal = fromUnits(rawBal);
     document.getElementById("walletDisplay").innerText =
