@@ -214,14 +214,16 @@
 <footer>Made with ❤️ — Testnet only while testing</footer>
 
 <script>
-/* ======= CONFIG ======= */
+/* ============================================================
+   FINAL INTEGRATED SCRIPT – blockchain ROI + P2P/withdraw fix
+   ============================================================ */
+
 const CONFIG = {
   tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
   stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
   decimals: 6
 };
 
-/* ======= ABIs ======= */
 const STAKING_ABI = [
   {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"ref","type":"address"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[{"internalType":"address","name":"refUser","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"refForRefUser","type":"address"}],"name":"stakeFor","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -245,8 +247,7 @@ const STAKING_ABI = [
   {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Registered","type":"event"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Staked","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"}],"name":"WithdrawalRequested","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"InstantCommissionPaid","type":"event"}
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"}],"name":"WithdrawalRequested","type":"event"}
 ];
 
 const TOKEN_ABI = [
@@ -254,230 +255,180 @@ const TOKEN_ABI = [
   "function approve(address,uint256) returns (bool)"
 ];
 
-/* ======= STATE ======= */
 let provider, signer, account, stakingContract, tokenContract;
-let readOnlyProvider, readOnlyStaking, readOnlyToken;
 
-/* ======= HELPERS ======= */
-function toFixedNumber(v, d = 6) { return Number(v).toLocaleString('en-US', {minimumFractionDigits:d,maximumFractionDigits:d}); }
-function fromUnits(bn) { try { return Number(ethers.utils.formatUnits(bn, CONFIG.decimals)); } catch { return 0; } }
+/* ---------- helpers ---------- */
+const fromUnits = bn => Number(ethers.utils.formatUnits(bn || 0, CONFIG.decimals));
+const toNum = (v, d=2)=>Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 
-/* ======= PROGRESS BAR ======= */
-function updateProgressBar(staked, target, earned) {
-  const fill = document.getElementById("progressFill");
-  const label = document.getElementById("progressLabel");
-  if (!fill || !label) return;
-  const pct = target > 0 ? Math.min(100, (earned / target) * 100) : 0;
-  fill.style.width = pct.toFixed(2) + "%";
-  label.innerText = `${pct.toFixed(2)}% completed`;
+/* ---------- UI ---------- */
+function updateProgressBar(staked,target,earned){
+  const fill=document.getElementById("progressFill");
+  const label=document.getElementById("progressLabel");
+  if(!fill||!label)return;
+  const pct=target>0?Math.min(100,(earned/target)*100):0;
+  fill.style.width=pct.toFixed(2)+"%";
+  label.innerText=`${pct.toFixed(2)}% completed`;
 }
 
-/* ======= INIT ======= */
-async function initProviderFromProviderObj(tempProvider) {
-  provider = tempProvider;
-  signer = provider.getSigner();
-  account = await signer.getAddress();
-  stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
-  tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
-  readOnlyProvider = provider;
-  readOnlyStaking = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, provider);
-  readOnlyToken = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, provider);
+/* ---------- INIT ---------- */
+async function initProvider(tempProv){
+  provider=tempProv;
+  signer=provider.getSigner();
+  account=await signer.getAddress();
+  stakingContract=new ethers.Contract(CONFIG.stakingAddress,STAKING_ABI,signer);
+  tokenContract=new ethers.Contract(CONFIG.tokenAddress,TOKEN_ABI,signer);
 
-  document.getElementById("walletDisplay").innerText = account;
-  const base = window.location.href.split("?")[0];
-  document.getElementById("refLink").value = `${base}?ref=${account}`;
+  document.getElementById("walletDisplay").innerText=account;
+  document.getElementById("refLink").value=window.location.origin+"?ref="+account;
 
-  attachUIHandlers();
+  attachHandlers();
   listenEvents();
-
-  // auto-balance refresh on Transfer
-  readOnlyToken.removeAllListeners && readOnlyToken.removeAllListeners("Transfer");
-  readOnlyToken.on("Transfer", (from, to, amount) => {
-    if (!account) return;
-    const me = account.toLowerCase();
-    if (from.toLowerCase() === me || to.toLowerCase() === me) refreshAll();
-  });
-
-  localStorage.setItem("staking_connected", "1");
   await refreshAll();
 }
 
-async function connect() {
-  if (!window.ethereum) return alert("Install MetaMask");
-  await window.ethereum.request({ method: "eth_requestAccounts" });
-  const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
-  await initProviderFromProviderObj(tempProv);
+async function connect(){
+  if(!window.ethereum)return alert("Install MetaMask");
+  await window.ethereum.request({method:"eth_requestAccounts"});
+  const p=new ethers.providers.Web3Provider(window.ethereum,"any");
+  await initProvider(p);
 }
+document.getElementById("connectBtn").onclick=connect;
 
-/* ======= AUTO CONNECT ======= */
-window.addEventListener("load", async () => {
-  if (window.ethereum) {
-    const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
-    const accs = await tempProv.listAccounts();
-    if (accs.length) await initProviderFromProviderObj(tempProv);
-  }
-});
+/* ---------- HANDLERS ---------- */
+function attachHandlers(){
+  if(window._attached)return;window._attached=true;
 
-/* ======= BUTTONS ======= */
-document.getElementById("connectBtn").onclick = connect;
-
-/* ======= HANDLERS ======= */
-function attachUIHandlers() {
-  if (window._uiHandlers) return; window._uiHandlers = true;
-
-  document.getElementById("approveBtn").onclick = async () => {
-    const tx = await tokenContract.approve(CONFIG.stakingAddress, ethers.constants.MaxUint256);
-    await tx.wait(); alert("Approved ✔"); refreshAll();
+  document.getElementById("approveBtn").onclick=async()=>{
+    const tx=await tokenContract.approve(CONFIG.stakingAddress,ethers.constants.MaxUint256);
+    await tx.wait();alert("Approved");refreshAll();
   };
 
-  document.getElementById("stakeBtn").onclick = async () => {
-    const amt = document.getElementById("stakeAmt").value;
-    if (!amt || amt < 20) return alert("Min 20 USDT");
-    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
-    const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
-    const tx = await stakingContract.stake(units, refParam);
-    await tx.wait();
-    alert("Stake successful ✔");
-    await refreshAll();
+  document.getElementById("stakeBtn").onclick=async()=>{
+    const amt=document.getElementById("stakeAmt").value;
+    if(!amt||amt<20)return alert("Min 20 USDT");
+    const ref=new URLSearchParams(window.location.search).get("ref")||ethers.constants.AddressZero;
+    const tx=await stakingContract.stake(ethers.utils.parseUnits(String(amt),CONFIG.decimals),ref);
+    await tx.wait();alert("Stake done");refreshAll();
   };
 
-  document.getElementById("stakeForBtn").onclick = async () => {
-    const amt = document.getElementById("p2pAmount").value;
-    const addr = document.getElementById("p2pAddress").value;
-    if (!amt || amt < 20) return alert("Min 20 USDT");
-    if (!ethers.utils.isAddress(addr)) return alert("Invalid address");
-    const owner = await stakingContract.owner();
-    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
-    const tx = await stakingContract.stakeFor(addr, units, owner);
-    await tx.wait();
-    alert("P2P stake done ✔");
-    await refreshAll();
+  document.getElementById("stakeForBtn").onclick=async()=>{
+    const amt=document.getElementById("p2pAmount").value;
+    const addr=document.getElementById("p2pAddress").value;
+    if(!amt||amt<20)return alert("Min 20 USDT");
+    if(!ethers.utils.isAddress(addr))return alert("Bad address");
+    const owner=await stakingContract.owner();
+    const tx=await stakingContract.stakeFor(addr,ethers.utils.parseUnits(String(amt),CONFIG.decimals),owner);
+    await tx.wait();alert("P2P stake done");
+    refreshAll();
   };
 
-  document.getElementById("requestWithdraw").onclick = async () => {
-    const amt = document.getElementById("withdrawAmt").value;
-    if (!amt || amt < 20) return alert("Min 20 USDT");
-    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
-    const tx = await stakingContract.requestWithdrawal(units);
-    await tx.wait();
-    alert("Withdrawal request submitted ✔");
-    await refreshAll();
+  document.getElementById("requestWithdraw").onclick=async()=>{
+    const amt=document.getElementById("withdrawAmt").value;
+    if(!amt||amt<20)return alert("Min 20");
+    const tx=await stakingContract.requestWithdrawal(ethers.utils.parseUnits(String(amt),CONFIG.decimals));
+    await tx.wait();alert("Withdrawal requested");
+    refreshAll();
   };
 
-  document.getElementById("refreshBtn").onclick = refreshAll;
-  document.getElementById("showTeam").onclick = loadTeamInfo;
-  document.getElementById("copyLink").onclick = async () => {
+  document.getElementById("refreshBtn").onclick=refreshAll;
+  document.getElementById("showTeam").onclick=loadTeamInfo;
+  document.getElementById("copyLink").onclick=async()=>{
     await navigator.clipboard.writeText(document.getElementById("refLink").value);
-    alert("Referral link copied!");
+    alert("Link copied!");
   };
 }
 
-/* ======= EVENTS ======= */
-function listenEvents() {
-  stakingContract.removeAllListeners && stakingContract.removeAllListeners();
-  stakingContract.on("Staked", () => refreshAll());
-  stakingContract.on("Registered", () => refreshAll());
-  stakingContract.on("InstantCommissionPaid", () => refreshAll());
-  stakingContract.on("WithdrawalRequested", () => refreshAll());
+/* ---------- EVENTS ---------- */
+function listenEvents(){
+  stakingContract.on("Staked",()=>refreshAll());
+  stakingContract.on("WithdrawalRequested",()=>refreshAll());
+  stakingContract.on("Registered",()=>refreshAll());
 }
 
-/* ======= FORCE ROI ======= */
-async function forceUpdateROI() {
-  if (!stakingContract || !account) return 0;
-  const info = await stakingContract.users(account);
-  const roi = fromUnits(info.roiIncome || info[5] || 0);
-  document.getElementById("roiPending").innerText = `${toFixedNumber(roi, 6)} USDT`;
+/* ---------- ROI + DASH ---------- */
+async function forceUpdateROI(){
+  const info=await stakingContract.users(account);
+  const roi=fromUnits(info.roiIncome);
+  document.getElementById("roiPending").innerText=`${toNum(roi,6)} USDT`;
   return roi;
 }
 
-/* ======= REFRESH ALL ======= */
-async function refreshAll() {
-  if (!stakingContract || !account) return;
-  const rawBal = await readOnlyToken.balanceOf(account);
-  const walletBal = fromUnits(rawBal);
-  document.getElementById("walletDisplay").innerText = `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
+async function refreshAll(){
+  if(!stakingContract||!account)return;
+  const bal=fromUnits(await tokenContract.balanceOf(account));
+  document.getElementById("walletDisplay").innerText=`${account} — ${toNum(bal,4)} USDT`;
 
-  const info = await stakingContract.users(account);
-  const staked = fromUnits(info.totalStake);
-  const roi = await forceUpdateROI();
-  const instant = fromUnits(info.instantIncome);
-  const level = fromUnits(info.levelIncome);
-  const earned = fromUnits(info.totalEarned);
-  const totalWallet = roi + instant + level;
+  const info=await stakingContract.users(account);
+  const staked=fromUnits(info.totalStake);
+  const roi=await forceUpdateROI();
+  const inst=fromUnits(info.instantIncome);
+  const lvl=fromUnits(info.levelIncome);
+  const earned=fromUnits(info.totalEarned);
+  const total=roi+inst+lvl;
 
-  document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
-  document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
-  document.getElementById("instantIncome").innerText = `${toFixedNumber(instant, 6)} USDT`;
-  document.getElementById("levelIncome").innerText = `${toFixedNumber(level, 6)} USDT`;
-  document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
-  document.getElementById("pkgStatus").innerText = info.isActive ? "✅ Active" : "Inactive";
+  document.getElementById("stakedDisplay").innerText=`${toNum(staked,6)} USDT`;
+  document.getElementById("targetDisplay").innerText=`${toNum(staked*3,6)} USDT`;
+  document.getElementById("instantIncome").innerText=`${toNum(inst,6)} USDT`;
+  document.getElementById("levelIncome").innerText=`${toNum(lvl,6)} USDT`;
+  document.getElementById("totalWallet").innerText=`${toNum(total,6)} USDT`;
+  document.getElementById("pkgStatus").innerText=info.isActive?"✅ Active":"Inactive";
 
-  try {
-    const days = await stakingContract.getTimeTo3x(account);
-    document.getElementById("days3x").innerText = `${days} days`;
-  } catch { document.getElementById("days3x").innerText = "N/A"; }
+  try{
+    const d=await stakingContract.getTimeTo3x(account);
+    document.getElementById("days3x").innerText=`${Number(d)} days`;
+  }catch{document.getElementById("days3x").innerText="N/A";}
 
-  updateProgressBar(staked, staked * 3, earned);
+  updateProgressBar(staked,staked*3,earned);
   await loadTeamInfo();
   await loadWithdrawHistory();
 }
 
-/* ======= TEAM INFO ======= */
-async function loadTeamInfo() {
-  if (!readOnlyStaking || !account) return;
-  const iface = readOnlyStaking.interface;
-  const filter = readOnlyStaking.filters.Registered(null, account);
-  const logs = await provider.getLogs({ address: CONFIG.stakingAddress, fromBlock: 0, toBlock: "latest", topics: filter.topics });
-  const directs = logs.map(l => iface.parseLog(l).args[0]);
-  let directCount = directs.length, indirectCount = 0, active = 0, inactive = 0;
-
-  for (const d of directs) {
-    const info = await readOnlyStaking.users(d);
-    if (fromUnits(info.totalStake) > 0) active++; else inactive++;
-    const flt = readOnlyStaking.filters.Registered(null, d);
-    const logs2 = await provider.getLogs({ address: CONFIG.stakingAddress, fromBlock: 0, toBlock: "latest", topics: flt.topics });
-    indirectCount += logs2.length;
+/* ---------- TEAM ---------- */
+async function loadTeamInfo(){
+  const iface=new ethers.utils.Interface(STAKING_ABI);
+  const filter={address:CONFIG.stakingAddress,topics:[ethers.utils.id("Registered(address,address)"),null,ethers.utils.hexZeroPad(account,32)],fromBlock:0,toBlock:"latest"};
+  const logs=await provider.getLogs(filter);
+  const directs=logs.map(l=>iface.decodeEventLog("Registered",l.data,l.topics)[0]);
+  const directCount=directs.length;
+  let indirect=0;
+  for(const d of directs){
+    const f2={address:CONFIG.stakingAddress,topics:[ethers.utils.id("Registered(address,address)"),null,ethers.utils.hexZeroPad(d,32)],fromBlock:0,toBlock:"latest"};
+    const l2=await provider.getLogs(f2);indirect+=l2.length;
   }
+  document.getElementById("directCount").innerText=directCount;
+  document.getElementById("indirectCount").innerText=indirect;
 
-  document.getElementById("directCount").innerText = directCount;
-  document.getElementById("indirectCount").innerText = indirectCount;
-  document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
-
-  // update levels
-  const rows = document.querySelectorAll("#levelsTbody tr");
-  rows.forEach((r, i) => {
-    const cell = r.querySelector("td:last-child");
-    if (i < Math.min(directCount, 10)) { cell.innerText = "Open ✅"; cell.style.color = "#00ff90"; }
-    else { cell.innerText = "Pending"; cell.style.color = ""; }
+  const rows=document.querySelectorAll("#levelsTbody tr");
+  rows.forEach((r,i)=>{
+    const c=r.querySelector("td:last-child");
+    if(i<Math.min(directCount,10)){c.innerText="Open ✅";c.style.color="#00ff90";}
+    else{c.innerText="Pending";c.style.color="";}
   });
 }
 
-/* ======= WITHDRAW HISTORY ======= */
-async function loadWithdrawHistory() {
-  const tbody = document.getElementById("withdrawHistoryBody");
-  tbody.innerHTML = '<tr><td colspan="4" class="center muted">Loading...</td></tr>';
-  try {
-    const total = await stakingContract.nextWithdrawId();
-    let html = "";
-    for (let i = total - 1; i >= 1; i--) {
-      const req = await stakingContract.withdrawals(i);
-      if (req.user.toLowerCase() !== account.toLowerCase()) continue;
-      const time = new Date(Number(req.timestamp) * 1000).toLocaleString();
-      const amt = fromUnits(req.amount);
-      const status = req.approved ? "✅ Approved" : "⏳ Pending";
-      html += `<tr><td>${time}</td><td>${toFixedNumber(amt, 2)} USDT</td><td>${status}</td><td>${i}</td></tr>`;
+/* ---------- WITHDRAW HISTORY ---------- */
+async function loadWithdrawHistory(){
+  const tb=document.getElementById("withdrawHistoryBody");
+  tb.innerHTML='<tr><td colspan="4" class="center muted">Loading...</td></tr>';
+  try{
+    const n=Number(await stakingContract.nextWithdrawId());
+    let html="";
+    for(let i=n-1;i>=1;i--){
+      const r=await stakingContract.withdrawals(i);
+      if(r.user.toLowerCase()!==account.toLowerCase())continue;
+      const t=new Date(Number(r.timestamp)*1000).toLocaleString();
+      html+=`<tr><td>${t}</td><td>${toNum(fromUnits(r.amount),2)} USDT</td><td>${r.approved?"✅ Approved":"⏳ Pending"}</td><td>${i}</td></tr>`;
     }
-    tbody.innerHTML = html || '<tr><td colspan="4" class="center muted">No history yet.</td></tr>';
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="4" class="center muted">Error</td></tr>';
-  }
+    tb.innerHTML=html||'<tr><td colspan="4" class="center muted">No history</td></tr>';
+  }catch{tb.innerHTML='<tr><td colspan="4">Error</td></tr>';}
 }
 
-/* ======= META EVENTS ======= */
-if (window.ethereum) {
-  window.ethereum.on("accountsChanged", () => location.reload());
-  window.ethereum.on("chainChanged", () => location.reload());
+/* ---------- CHAIN LISTENERS ---------- */
+if(window.ethereum){
+  window.ethereum.on("accountsChanged",()=>location.reload());
+  window.ethereum.on("chainChanged",()=>location.reload());
 }
 
-console.log("✅ Full upgraded DApp JS loaded successfully.");
+console.log("✅  Final JS integrated – blockchain ROI only, P2P + withdraw + team fixed.");
 </script>
