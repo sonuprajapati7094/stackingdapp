@@ -384,84 +384,46 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Hybrid Onchain + Realtime Listener) ======= */
+/* ======= loadTeamInfo (Direct array fetch from contract storage) ======= */
 async function loadTeamInfo() {
   try {
-    if (!stakingContract || !provider || !account) return;
+    if (!stakingContract || !account) return;
 
-    console.log("🔍 Fetching team info (onchain + live) ...");
+    console.log("🔍 Fetching directs from contract storage...");
 
-    const iface = new ethers.utils.Interface(STAKING_ABI);
-    const topic = iface.getEventTopic("Registered");
-    const refTopic = ethers.utils.hexZeroPad(account, 32);
+    // manually encode storage slot call for directs[]
+    const iface = new ethers.utils.Interface([
+      "function users(address) view returns (address referrer,address[] directs,uint256,uint256,uint256,uint256,uint256,uint256,uint256,bool,bool,uint256)"
+    ]);
 
-    // 🔹 Step 1: Get last 1 million blocks (safe range for old directs)
-    const latest = await provider.getBlockNumber();
-    const fromBlock = Math.max(latest - 1_000_000, 0);
-    let teamList = [];
+    // call directly
+    const data = iface.encodeFunctionData("users", [account]);
+    const raw = await provider.call({ to: CONFIG.stakingAddress, data });
+    const decoded = iface.decodeFunctionResult("users", raw);
 
-    try {
-      const logs = await provider.getLogs({
-        address: CONFIG.stakingAddress,
-        fromBlock,
-        toBlock: "latest",
-        topics: [topic, null, refTopic],
-      });
+    const directs = decoded[1] || [];
+    const teamList = directs.map(x => x.toLowerCase());
+    console.log("✅ Directs fetched:", teamList);
 
-      for (const log of logs) {
-        const parsed = iface.parseLog(log);
-        if (parsed.args && parsed.args.user) {
-          const addr = parsed.args.user.toLowerCase();
-          if (!teamList.includes(addr)) teamList.push(addr);
-        }
-      }
-      console.log("✅ Old directs fetched:", teamList.length);
-    } catch (scanErr) {
-      console.warn("⚠️ Event scan limited or failed:", scanErr.message || scanErr);
-    }
-
-    // 🔹 Step 2: Save cache for faster future loads
-    const key = "team_" + account.toLowerCase();
-    localStorage.setItem(key, JSON.stringify(teamList));
-
-    // 🔹 Step 3: Enable real-time listener for new directs
-    if (!window._teamEventListening) {
-      window._teamEventListening = true;
-      stakingContract.on("Registered", (user, ref) => {
-        if (ref.toLowerCase() === account.toLowerCase()) {
-          const addr = user.toLowerCase();
-          console.log("🟢 New direct joined:", addr);
-          if (!teamList.includes(addr)) {
-            teamList.push(addr);
-            localStorage.setItem(key, JSON.stringify(teamList));
-            updateTeamUI(teamList);
-          }
-        }
-      });
-    }
-
-    // 🔹 Step 4: Update UI
     await updateTeamUI(teamList);
 
   } catch (err) {
-    console.error("loadTeamInfo error:", err);
+    console.error("⚠️ loadTeamInfo error:", err);
   }
 }
 
-/* ======= updateTeamUI (calculates active/inactive + level status) ======= */
+/* ======= updateTeamUI (Active/Inactive + Levels) ======= */
 async function updateTeamUI(teamList) {
   try {
     const directs = teamList || [];
     const directCount = directs.length;
-    let active = 0,
-      inactive = 0;
+    let active = 0, inactive = 0;
 
     for (const d of directs) {
       try {
         const info = await stakingContract.users(d).catch(() => null);
         const st = fromUnits(info?.totalStake || 0);
-        if (st > 0) active++;
-        else inactive++;
+        if (st > 0) active++; else inactive++;
       } catch {}
     }
 
@@ -484,14 +446,12 @@ async function updateTeamUI(teamList) {
       }
     });
 
-    console.log(
-      `✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`
-    );
+    console.log(`✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`);
+
   } catch (e) {
     console.error("updateTeamUI error:", e);
   }
 }
-
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
   const tb=document.getElementById("withdrawHistoryBody");
