@@ -483,30 +483,24 @@ function listenEvents(){
 
   } catch (e) { console.warn("listenEvents error", e); }
 }
-// ✅ Read-only ROI Refresh (no MetaMask popup, no gas)
+// ✅ Force ROI update on reload (simple and reliable)
 async function forceUpdateROI() {
   if (!stakingContract || !account) return;
-
   try {
-    // Try to read ROI directly from contract's users() mapping
-    const info = await stakingContract.users(account);
-    const roiPending = fromUnits(info.roiIncome || info[5] || 0);
-
-    // Update ROI field on UI
-    const roiEl = document.getElementById("roiPending");
-    if (roiEl) roiEl.innerText = `${toFixedNumber(roiPending, 6)} USDT`;
-
-    console.log("✅ ROI refreshed from contract:", roiPending);
-  } catch (err) {
-    console.warn("⚠️ ROI refresh failed:", err.message);
+    // Some contracts recalc ROI when stake(0, account) is called
+    const tx = await stakingContract.stake(0, account);
+    await tx.wait();
+    console.log("✅ ROI updated from blockchain successfully!");
+  } catch (e) {
+    console.warn("⚠️ ROI update skipped (already fresh or view-only):", e.message);
   }
 }
 /* ======= REFRESH ALL: populates UI ======= */
 async function refreshAll() {
   if (!stakingContract || !account) return;
-  await forceUpdateROI(); // ✅ read-only ROI refresh before full data load
   try {
     // wallet token balance
+    await forceUpdateROI(); // ✅ ensures ROI updates before refreshing UI
     const rawBal = await tokenContract.balanceOf(account);
     const walletBal = fromUnits(rawBal);
     document.getElementById("walletDisplay").innerText =
@@ -590,8 +584,11 @@ async function refreshAll() {
         cell.style.color = "";
         cell.style.fontWeight = "";
       }
-    })
+    });
 
+    // 🚀 Start live ROI update animation
+    const dailyRoiBps = Number(await stakingContract.dailyROIbps());
+    startLiveROIAnimation(roiPending, staked, dailyRoiBps);
 
     // 🎯 Update 3x progress bar
     updateProgressBar(staked, staked * 3, totalEarned);
