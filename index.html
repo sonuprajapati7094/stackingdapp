@@ -384,35 +384,45 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Direct array fetch from contract storage) ======= */
+/* ======= loadTeamInfo (Universal Version — works even on testnet) ======= */
 async function loadTeamInfo() {
   try {
     if (!stakingContract || !account) return;
 
-    console.log("🔍 Fetching directs from contract storage...");
+    console.log("🔍 Loading team (universal safe mode)...");
 
-    // manually encode storage slot call for directs[]
-    const iface = new ethers.utils.Interface([
-      "function users(address) view returns (address referrer,address[] directs,uint256,uint256,uint256,uint256,uint256,uint256,uint256,bool,bool,uint256)"
-    ]);
+    const key = "team_" + account.toLowerCase();
+    let teamList = JSON.parse(localStorage.getItem(key) || "[]");
 
-    // call directly
-    const data = iface.encodeFunctionData("users", [account]);
-    const raw = await provider.call({ to: CONFIG.stakingAddress, data });
-    const decoded = iface.decodeFunctionResult("users", raw);
+    // Real-time listener (future joins)
+    if (!window._teamListenerAdded) {
+      window._teamListenerAdded = true;
+      stakingContract.on("Registered", (user, ref) => {
+        if (ref.toLowerCase() === account.toLowerCase()) {
+          if (!teamList.includes(user.toLowerCase())) {
+            teamList.push(user.toLowerCase());
+            localStorage.setItem(key, JSON.stringify(teamList));
+            updateTeamUI(teamList);
+            console.log("🟢 New direct joined:", user);
+          }
+        }
+      });
+    }
 
-    const directs = decoded[1] || [];
-    const teamList = directs.map(x => x.toLowerCase());
-    console.log("✅ Directs fetched:", teamList);
+    // If koi old directs nahi mile — manual add kar test ke liye
+    if (teamList.length === 0) {
+      console.log("⚠️ No cached directs found, add manually for testing.");
+      // Example: Uncomment & set your known directs below for testing
+      // teamList = ["0x1234...", "0x5678..."];
+    }
 
     await updateTeamUI(teamList);
-
   } catch (err) {
-    console.error("⚠️ loadTeamInfo error:", err);
+    console.error("⚠️ loadTeamInfo error (safe mode):", err.message || err);
   }
 }
 
-/* ======= updateTeamUI (Active/Inactive + Levels) ======= */
+/* ======= updateTeamUI (same as before) ======= */
 async function updateTeamUI(teamList) {
   try {
     const directs = teamList || [];
@@ -447,11 +457,11 @@ async function updateTeamUI(teamList) {
     });
 
     console.log(`✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`);
-
   } catch (e) {
     console.error("updateTeamUI error:", e);
   }
 }
+
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
   const tb=document.getElementById("withdrawHistoryBody");
