@@ -353,6 +353,32 @@ async function forceUpdateROI(){
   document.getElementById("roiPending").innerText=`${toNum(roi,6)} USDT`;
   return roi;
 }
+/* ======= Recursive Team Fetch (up to 10 levels) ======= */
+async function getFullTeamTree(userAddr, level = 1, maxLevel = 10, visited = new Set()) {
+  if (level > maxLevel || visited.has(userAddr)) return [];
+  visited.add(userAddr);
+
+  let directs = [];
+  try {
+    // Directs from contract struct
+    const u = await stakingContract.users(userAddr).catch(() => null);
+    if (u && u.directs && u.directs.length > 0) {
+      directs = u.directs;
+    }
+  } catch (err) {
+    console.warn("Error fetching directs of", userAddr, err);
+  }
+
+  let allTeam = [...directs];
+
+  // Go deeper for each direct
+  for (const d of directs) {
+    const subTeam = await getFullTeamTree(d, level + 1, maxLevel, visited);
+    allTeam = allTeam.concat(subTeam);
+  }
+
+  return allTeam;
+}
 
 async function refreshAll(){
   if(!stakingContract||!account)return;
@@ -384,43 +410,33 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Universal Version — works even on testnet) ======= */
-async function loadTeamInfo() {
+/* ======= Recursive Team Fetch (up to 10 levels) ======= */
+async function getFullTeamTree(userAddr, level = 1, maxLevel = 10, visited = new Set()) {
+  if (level > maxLevel || visited.has(userAddr)) return [];
+  visited.add(userAddr);
+
+  let directs = [];
   try {
-    if (!stakingContract || !account) return;
-
-    console.log("🔍 Loading team (universal safe mode)...");
-
-    const key = "team_" + account.toLowerCase();
-    let teamList = JSON.parse(localStorage.getItem(key) || "[]");
-
-    // Real-time listener (future joins)
-    if (!window._teamListenerAdded) {
-      window._teamListenerAdded = true;
-      stakingContract.on("Registered", (user, ref) => {
-        if (ref.toLowerCase() === account.toLowerCase()) {
-          if (!teamList.includes(user.toLowerCase())) {
-            teamList.push(user.toLowerCase());
-            localStorage.setItem(key, JSON.stringify(teamList));
-            updateTeamUI(teamList);
-            console.log("🟢 New direct joined:", user);
-          }
-        }
-      });
+    // Directs from contract struct
+    const u = await stakingContract.users(userAddr).catch(() => null);
+    if (u && u.directs && u.directs.length > 0) {
+      directs = u.directs;
     }
-
-    // If koi old directs nahi mile — manual add kar test ke liye
-    if (teamList.length === 0) {
-      console.log("⚠️ No cached directs found, add manually for testing.");
-      // Example: Uncomment & set your known directs below for testing
-      // teamList = ["0x1234...", "0x5678..."];
-    }
-
-    await updateTeamUI(teamList);
   } catch (err) {
-    console.error("⚠️ loadTeamInfo error (safe mode):", err.message || err);
+    console.warn("Error fetching directs of", userAddr, err);
   }
+
+  let allTeam = [...directs];
+
+  // Go deeper for each direct
+  for (const d of directs) {
+    const subTeam = await getFullTeamTree(d, level + 1, maxLevel, visited);
+    allTeam = allTeam.concat(subTeam);
+  }
+
+  return allTeam;
 }
+
 
 async function updateTeamUI(teamList) {
   try {
