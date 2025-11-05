@@ -385,26 +385,103 @@ async function refreshAll(){
 }
 
 /* ---------- TEAM ---------- */
+/* ======= loadTeamInfo (REPLACEMENT - robust & defensive) ======= */
 async function loadTeamInfo(){
-  const iface=new ethers.utils.Interface(STAKING_ABI);
-  const filter={address:CONFIG.stakingAddress,topics:[ethers.utils.id("Registered(address,address)"),null,ethers.utils.hexZeroPad(account,32)],fromBlock:0,toBlock:"latest"};
-  const logs=await provider.getLogs(filter);
-  const directs=logs.map(l=>iface.decodeEventLog("Registered",l.data,l.topics)[0]);
-  const directCount=directs.length;
-  let indirect=0;
-  for(const d of directs){
-    const f2={address:CONFIG.stakingAddress,topics:[ethers.utils.id("Registered(address,address)"),null,ethers.utils.hexZeroPad(d,32)],fromBlock:0,toBlock:"latest"};
-    const l2=await provider.getLogs(f2);indirect+=l2.length;
-  }
-  document.getElementById("directCount").innerText=directCount;
-  document.getElementById("indirectCount").innerText=indirect;
+  try {
+    if (!provider || !stakingContract || !account) return;
 
-  const rows=document.querySelectorAll("#levelsTbody tr");
-  rows.forEach((r,i)=>{
-    const c=r.querySelector("td:last-child");
-    if(i<Math.min(directCount,10)){c.innerText="Open ✅";c.style.color="#00ff90";}
-    else{c.innerText="Pending";c.style.color="";}
-  });
+    // Prefer direct helper if contract has it (safer & faster)
+    let directAddrs = [];
+    if (typeof stakingContract.getDirectRefs === "function") {
+      try {
+        const dr = await stakingContract.getDirectRefs(account).catch(()=>[]);
+        if (Array.isArray(dr)) directAddrs = dr;
+      } catch(e) { /* ignore and fallback to events */ }
+    }
+
+    // Fallback: scan Registered events with referrer == account
+    if (directAddrs.length === 0) {
+      const iface = stakingContract.interface; // use signer contract interface
+      // Build topics for Registered(address user, address referrer)
+      const topicRegistered = iface.getEventTopic("Registered");
+      // topic layout: [topicRegistered, null, keccak256(referrer padded)] when second param indexed
+      // Note: event was declared as (address indexed user, address indexed referrer)
+      const refTopic = ethers.utils.hexZeroPad(account, 32);
+      const filter = {
+        address: CONFIG.stakingAddress,
+        fromBlock: 0,
+        toBlock: "latest",
+        topics: [topicRegistered, null, refTopic]
+      };
+      const logs = await provider.getLogs(filter).catch(()=>[]);
+      if (logs && logs.length) {
+        directAddrs = [];
+        for (const lg of logs) {
+          try {
+            const parsed = iface.parseLog(lg);
+            // parsed.args[0] is user (the direct)
+            const userAddr = parsed.args[0];
+            directAddrs.push(userAddr);
+          } catch (err) {
+            // skip parse error
+          }
+        }
+      } else {
+        directAddrs = [];
+      }
+    }
+
+    // compute counts and update UI
+    const directCount = directAddrs.length;
+    let indirectCount = 0;
+    let active = 0, inactive = 0;
+
+    // For each direct, count stake activity and second-level refs
+    for (const d of directAddrs) {
+      try {
+        const ui = await stakingContract.users(d).catch(()=>null);
+        const stakeAmt = ui ? fromUnits(ui.totalStake || ui[1] || 0) : 0;
+        if (stakeAmt > 0) active++; else inactive++;
+        // second level (fast check using logs)
+        const iface2 = stakingContract.interface;
+        const topicRegistered = iface2.getEventTopic("Registered");
+        const refTopic2 = ethers.utils.hexZeroPad(d, 32);
+        const filter2 = { address: CONFIG.stakingAddress, fromBlock: 0, toBlock: "latest", topics: [topicRegistered, null, refTopic2] };
+        const logs2 = await provider.getLogs(filter2).catch(()=>[]);
+        indirectCount += (logs2 && logs2.length) ? logs2.length : 0;
+      } catch (err) {
+        // ignore per-user errors
+      }
+    }
+
+    // render numbers
+    document.getElementById("directCount").innerText = directCount;
+    document.getElementById("indirectCount").innerText = indirectCount;
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
+    // update level rows (Open if directCount >= level index)
+    const rows = document.querySelectorAll("#levelsTbody tr");
+    rows.forEach((r, i) => {
+      const cell = r.querySelector("td:last-child");
+      if (!cell) return;
+      if (i < Math.min(directCount, 10)) {
+        cell.innerText = "Open ✅";
+        cell.style.color = "#00FF90";
+        cell.style.fontWeight = "600";
+      } else {
+        cell.innerText = "Pending";
+        cell.style.color = "";
+        cell.style.fontWeight = "";
+      }
+    });
+
+  } catch (e) {
+    console.warn("loadTeamInfo error:", e);
+    // keep UI stable but indicate unknown
+    document.getElementById("directCount").innerText = "0";
+    document.getElementById("indirectCount").innerText = "0";
+    document.getElementById("activeCounts").innerText = "0 / 0";
+  }
 }
 
 /* ---------- WITHDRAW HISTORY ---------- */
