@@ -384,51 +384,91 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Local Cache Version - Works Without RPC Logs) ======= */
+/* ======= loadTeamInfo (Hybrid Onchain + Realtime Listener) ======= */
 async function loadTeamInfo() {
   try {
-    if (!account) return;
+    if (!stakingContract || !provider || !account) return;
 
-    console.log("🔍 Loading team info from local cache...");
+    console.log("🔍 Fetching team info (onchain + live) ...");
 
-    // Local storage key
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const topic = iface.getEventTopic("Registered");
+    const refTopic = ethers.utils.hexZeroPad(account, 32);
+
+    // 🔹 Step 1: Get last 1 million blocks (safe range for old directs)
+    const latest = await provider.getBlockNumber();
+    const fromBlock = Math.max(latest - 1_000_000, 0);
+    let teamList = [];
+
+    try {
+      const logs = await provider.getLogs({
+        address: CONFIG.stakingAddress,
+        fromBlock,
+        toBlock: "latest",
+        topics: [topic, null, refTopic],
+      });
+
+      for (const log of logs) {
+        const parsed = iface.parseLog(log);
+        if (parsed.args && parsed.args.user) {
+          const addr = parsed.args.user.toLowerCase();
+          if (!teamList.includes(addr)) teamList.push(addr);
+        }
+      }
+      console.log("✅ Old directs fetched:", teamList.length);
+    } catch (scanErr) {
+      console.warn("⚠️ Event scan limited or failed:", scanErr.message || scanErr);
+    }
+
+    // 🔹 Step 2: Save cache for faster future loads
     const key = "team_" + account.toLowerCase();
-    let teamData = JSON.parse(localStorage.getItem(key) || "[]");
+    localStorage.setItem(key, JSON.stringify(teamList));
 
-    // Add live Registered events (listen once)
-    if (stakingContract && !window._teamListenerAdded) {
-      window._teamListenerAdded = true;
+    // 🔹 Step 3: Enable real-time listener for new directs
+    if (!window._teamEventListening) {
+      window._teamEventListening = true;
       stakingContract.on("Registered", (user, ref) => {
         if (ref.toLowerCase() === account.toLowerCase()) {
-          console.log("🆕 New direct joined:", user);
-          if (!teamData.includes(user)) {
-            teamData.push(user);
-            localStorage.setItem(key, JSON.stringify(teamData));
-            loadTeamInfo(); // refresh
+          const addr = user.toLowerCase();
+          console.log("🟢 New direct joined:", addr);
+          if (!teamList.includes(addr)) {
+            teamList.push(addr);
+            localStorage.setItem(key, JSON.stringify(teamList));
+            updateTeamUI(teamList);
           }
         }
       });
     }
 
-    const directs = teamData || [];
-    const directCount = directs.length;
-    let active = 0, inactive = 0, indirectCount = 0;
+    // 🔹 Step 4: Update UI
+    await updateTeamUI(teamList);
 
-    // Check active/inactive (simple)
+  } catch (err) {
+    console.error("loadTeamInfo error:", err);
+  }
+}
+
+/* ======= updateTeamUI (calculates active/inactive + level status) ======= */
+async function updateTeamUI(teamList) {
+  try {
+    const directs = teamList || [];
+    const directCount = directs.length;
+    let active = 0,
+      inactive = 0;
+
     for (const d of directs) {
       try {
-        const info = await stakingContract.users(d).catch(()=>null);
+        const info = await stakingContract.users(d).catch(() => null);
         const st = fromUnits(info?.totalStake || 0);
-        if (st > 0) active++; else inactive++;
+        if (st > 0) active++;
+        else inactive++;
       } catch {}
     }
 
-    // Update UI
     document.getElementById("directCount").innerText = directCount;
-    document.getElementById("indirectCount").innerText = indirectCount;
+    document.getElementById("indirectCount").innerText = 0;
     document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
 
-    // Level unlock
     const rows = document.querySelectorAll("#levelsTbody tr");
     rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
@@ -444,15 +484,14 @@ async function loadTeamInfo() {
       }
     });
 
-    console.log(`✅ Team loaded from local cache (${directCount} directs)`);
-
+    console.log(
+      `✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`
+    );
   } catch (e) {
-    console.error("⚠️ loadTeamInfo error:", e);
-    document.getElementById("directCount").innerText = "0";
-    document.getElementById("indirectCount").innerText = "0";
-    document.getElementById("activeCounts").innerText = "0 / 0";
+    console.error("updateTeamUI error:", e);
   }
 }
+
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
   const tb=document.getElementById("withdrawHistoryBody");
