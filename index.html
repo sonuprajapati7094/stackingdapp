@@ -213,9 +213,8 @@
 
 <footer>Made with ❤️ — Testnet only while testing</footer>
 
-<!-- ======= SCRIPT PART 1/4 ======= -->
 <script>
-/* ======= CONFIG - REPLACE these addresses if needed ======= */
+/* ======= CONFIG ======= */
 const CONFIG = {
   tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
   stakingAddress: "0xE65396C1B8c63167A86d374ec7aD8F1471CC1F2f",
@@ -247,490 +246,238 @@ const STAKING_ABI = [
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"referrer","type":"address"}],"name":"Registered","type":"event"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Staked","type":"event"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"}],"name":"WithdrawalRequested","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"InstantCommissionPaid","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"referrer","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"ReferralCredited","type":"event"}
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"InstantCommissionPaid","type":"event"}
 ];
 
 const TOKEN_ABI = [
-  "function decimals() view returns (uint8)",
   "function balanceOf(address) view returns (uint256)",
   "function approve(address,uint256) returns (bool)"
 ];
 
 /* ======= STATE ======= */
 let provider, signer, account, stakingContract, tokenContract;
-let liveROITimer = null;
+let readOnlyProvider, readOnlyStaking, readOnlyToken;
 
 /* ======= HELPERS ======= */
-function toFixedNumber(v, d = 6) {
-  return Number(v).toLocaleString('en-US', {minimumFractionDigits:d,maximumFractionDigits:d});
-}
-function fromUnits(bn) {
-  try { return Number(ethers.utils.formatUnits(bn, CONFIG.decimals)); } catch (e) { return 0; }
+function toFixedNumber(v, d = 6) { return Number(v).toLocaleString('en-US', {minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fromUnits(bn) { try { return Number(ethers.utils.formatUnits(bn, CONFIG.decimals)); } catch { return 0; } }
+
+/* ======= PROGRESS BAR ======= */
+function updateProgressBar(staked, target, earned) {
+  const fill = document.getElementById("progressFill");
+  const label = document.getElementById("progressLabel");
+  if (!fill || !label) return;
+  const pct = target > 0 ? Math.min(100, (earned / target) * 100) : 0;
+  fill.style.width = pct.toFixed(2) + "%";
+  label.innerText = `${pct.toFixed(2)}% completed`;
 }
 
-/* ======= UI helpers ======= */
-function updateProgressBar(staked, target, totalEarned) {
-  try {
-    const fill = document.getElementById("progressFill");
-    const label = document.getElementById("progressLabel");
-    if (!fill || !label) return;
-    const pct = target > 0 ? Math.min(100, (totalEarned / target) * 100) : 0;
-    fill.style.width = pct.toFixed(2) + "%";
-    label.innerText = `${pct.toFixed(2)}% completed`;
-  } catch (e) {
-    console.warn("updateProgressBar error:", e);
-  }
-}
-
-/* ======= CONNECT / INIT ======= */
+/* ======= INIT ======= */
 async function initProviderFromProviderObj(tempProvider) {
   provider = tempProvider;
   signer = provider.getSigner();
   account = await signer.getAddress();
   stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
   tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
+  readOnlyProvider = provider;
+  readOnlyStaking = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, provider);
+  readOnlyToken = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, provider);
 
-  document.getElementById("walletDisplay").innerText = `${account}`;
-
-  // referral link
+  document.getElementById("walletDisplay").innerText = account;
   const base = window.location.href.split("?")[0];
   document.getElementById("refLink").value = `${base}?ref=${account}`;
 
-  attachUIHandlers(); // safe to call (idempotent)
+  attachUIHandlers();
   listenEvents();
 
-  // set local flag so reload auto reconnects
-  localStorage.setItem("staking_connected", "1");
+  // auto-balance refresh on Transfer
+  readOnlyToken.removeAllListeners && readOnlyToken.removeAllListeners("Transfer");
+  readOnlyToken.on("Transfer", (from, to, amount) => {
+    if (!account) return;
+    const me = account.toLowerCase();
+    if (from.toLowerCase() === me || to.toLowerCase() === me) refreshAll();
+  });
 
-  // initial refresh
+  localStorage.setItem("staking_connected", "1");
   await refreshAll();
 }
 
 async function connect() {
-  if (!window.ethereum) return alert("MetaMask not found. Install and refresh.");
-  try {
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
-    await initProviderFromProviderObj(tempProv);
-  } catch (e) {
-    console.error("connect failed:", e);
-    throw e;
-  }
+  if (!window.ethereum) return alert("Install MetaMask");
+  await window.ethereum.request({ method: "eth_requestAccounts" });
+  const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
+  await initProviderFromProviderObj(tempProv);
 }
 
-/* ======= attach click on connect btn ======= */
-document.getElementById("connectBtn").addEventListener("click", async () => {
-  try {
-    await connect();
-  } catch (e) { alert("Connect failed: " + (e.message || e)); }
-});
-
-/* ======= Auto reconnect + ROI refresh on reload ======= */
+/* ======= AUTO CONNECT ======= */
 window.addEventListener("load", async () => {
-  try {
-    if (window.ethereum) {
-      const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
-      const accs = await tempProv.listAccounts();
-      if (accs && accs.length > 0) {
-        await initProviderFromProviderObj(tempProv);
-        console.log("✅ Auto reconnect (wallet available)");
-        return;
-      }
-    }
-    if (localStorage.getItem("staking_connected")) {
-      try {
-        if (window.ethereum) {
-          const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
-          const accs = await tempProv.listAccounts();
-          if (accs && accs.length > 0) {
-            await initProviderFromProviderObj(tempProv);
-            console.log("✅ Auto reconnect from localStorage");
-          } else {
-            console.log("Local flag present but wallet not authorized - user action required");
-          }
-        }
-      } catch (e) { console.warn("Auto reconnect error:", e); }
-    }
-  } catch (e) { console.warn("Auto load handler error:", e); }
+  if (window.ethereum) {
+    const tempProv = new ethers.providers.Web3Provider(window.ethereum, "any");
+    const accs = await tempProv.listAccounts();
+    if (accs.length) await initProviderFromProviderObj(tempProv);
+  }
 });
-</script>
-<!-- ======= END PART 1/4 ======= -->
-<!-- ======= SCRIPT PART 2/4 ======= -->
-<script>
-/* ======= UI HANDLERS (attach once) ======= */
-let uiHandlersAttached = false;
-function attachUIHandlers(){
-  if (uiHandlersAttached) return;
-  uiHandlersAttached = true;
 
-  // quick approve
+/* ======= BUTTONS ======= */
+document.getElementById("connectBtn").onclick = connect;
+
+/* ======= HANDLERS ======= */
+function attachUIHandlers() {
+  if (window._uiHandlers) return; window._uiHandlers = true;
+
   document.getElementById("approveBtn").onclick = async () => {
-    if (!tokenContract) return alert("Connect wallet first");
-    try {
-      const tx = await tokenContract.approve(CONFIG.stakingAddress, ethers.constants.MaxUint256);
-      await tx.wait();
-      alert("Approved ✔");
-      await refreshAll();
-    } catch (e) { console.error(e); alert("Approve failed: " + (e.message || e)); }
+    const tx = await tokenContract.approve(CONFIG.stakingAddress, ethers.constants.MaxUint256);
+    await tx.wait(); alert("Approved ✔"); refreshAll();
   };
 
-  // stake
   document.getElementById("stakeBtn").onclick = async () => {
-    try {
-      if (!stakingContract) return alert("Connect wallet first");
-      const amount = document.getElementById("stakeAmt").value;
-      if (!amount || Number(amount) < 20) return alert("Minimum stake 20 USDT");
-      const units = ethers.utils.parseUnits(String(amount), CONFIG.decimals);
-
-      // auto-register (best-effort)
-      const isReg = await stakingContract.registered(account).catch(()=>false);
-      const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
-      if (!isReg) {
-        let refToUse = ethers.constants.AddressZero;
-        if (refParam && ethers.utils.isAddress(refParam)) refToUse = refParam;
-        try {
-          const txr = await stakingContract.register(refToUse);
-          await txr.wait();
-          console.log("Auto-registered with ref:", refToUse);
-        } catch (regErr) {
-          console.warn("Auto register failed:", regErr);
-        }
-      }
-
-      const tx = await stakingContract.stake(units, refParam || ethers.constants.AddressZero);
-      await tx.wait();
-      alert("Stake successful ✔");
-      await refreshAll();
-      await startLiveROI();
-    } catch (e) {
-      console.error("Stake failed:", e);
-      const msg = e?.error?.message || e?.data?.message || e?.message || e;
-      alert("Stake failed: " + String(msg).slice(0,300));
-    }
+    const amt = document.getElementById("stakeAmt").value;
+    if (!amt || amt < 20) return alert("Min 20 USDT");
+    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
+    const refParam = new URLSearchParams(window.location.search).get("ref") || ethers.constants.AddressZero;
+    const tx = await stakingContract.stake(units, refParam);
+    await tx.wait();
+    alert("Stake successful ✔");
+    await refreshAll();
   };
 
-  // stakeFor (P2P)
   document.getElementById("stakeForBtn").onclick = async () => {
-    try {
-      if (!stakingContract) return alert("Connect wallet first");
-      const amtStr = document.getElementById("p2pAmount").value;
-      const addr = document.getElementById("p2pAddress").value;
-      if (!amtStr || Number(amtStr) < 20) return alert("P2P min 20");
-      if (!addr || !ethers.utils.isAddress(addr)) return alert("Enter valid wallet address");
-      const units = ethers.utils.parseUnits(String(amtStr), CONFIG.decimals);
-      const owner = await stakingContract.owner();
-      const tx = await stakingContract.stakeFor(addr, units, owner);
-      await tx.wait();
-      alert("P2P stake successful ✔");
-
-      // refresh UI so wallet balance deducts and dashboard updates
-      await refreshAll();
-      await startLiveROI();
-    } catch (e) {
-      console.error("StakeFor failed:", e);
-      alert("P2P stake failed: " + (e?.message || e));
-    }
+    const amt = document.getElementById("p2pAmount").value;
+    const addr = document.getElementById("p2pAddress").value;
+    if (!amt || amt < 20) return alert("Min 20 USDT");
+    if (!ethers.utils.isAddress(addr)) return alert("Invalid address");
+    const owner = await stakingContract.owner();
+    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
+    const tx = await stakingContract.stakeFor(addr, units, owner);
+    await tx.wait();
+    alert("P2P stake done ✔");
+    await refreshAll();
   };
 
-  // withdraw
   document.getElementById("requestWithdraw").onclick = async () => {
-    try {
-      if (!stakingContract) return alert("Connect wallet first");
-      const amt = document.getElementById("withdrawAmt").value;
-      if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
-      const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
-      const tx = await stakingContract.requestWithdrawal(units);
-      await tx.wait();
-      document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
-
-      // refresh balances and live ROI
-      await refreshAll();
-      await startLiveROI();
-    } catch (e) {
-      console.error("Withdraw failed:", e);
-      alert("Withdraw failed: " + (e?.message || e));
-    }
+    const amt = document.getElementById("withdrawAmt").value;
+    if (!amt || amt < 20) return alert("Min 20 USDT");
+    const units = ethers.utils.parseUnits(String(amt), CONFIG.decimals);
+    const tx = await stakingContract.requestWithdrawal(units);
+    await tx.wait();
+    alert("Withdrawal request submitted ✔");
+    await refreshAll();
   };
 
-  // copy referral
+  document.getElementById("refreshBtn").onclick = refreshAll;
+  document.getElementById("showTeam").onclick = loadTeamInfo;
   document.getElementById("copyLink").onclick = async () => {
-    const v = document.getElementById("refLink").value;
-    if (!v) return alert("No link yet");
-    await navigator.clipboard.writeText(v);
+    await navigator.clipboard.writeText(document.getElementById("refLink").value);
     alert("Referral link copied!");
   };
-
-  // show team (simple refresh)
-  document.getElementById("showTeam").onclick = async () => {
-    await loadTeamInfo();
-    alert("Team data refreshed (see UI)");
-  };
-
-  // refresh
-  document.getElementById("refreshBtn").onclick = refreshAll;
-}
-</script>
-<!-- ======= END PART 2/4 ======= -->
-<!-- ======= SCRIPT PART 3/4 ======= -->
-<script>
-/* ======= LISTEN CONTRACT EVENTS ======= */
-function listenEvents(){
-  if (!stakingContract) return;
-  try {
-    stakingContract.removeAllListeners && stakingContract.removeAllListeners();
-
-    stakingContract.on("Staked", (user, amount) => {
-      console.log("Staked event:", user, amount.toString());
-      if (user && account && user.toLowerCase() === account.toLowerCase()) {
-        alert("✅ Your stake processed");
-      }
-      refreshAll().catch(()=>{});
-    });
-
-    stakingContract.on("Registered", (user, ref) => {
-      console.log("Registered:", user, ref);
-      refreshAll().catch(()=>{});
-    });
-
-    // custom events if contract emits them
-    try {
-      stakingContract.on("ReferralCredited", (referrer, from, amount) => {
-        console.log("ReferralCredited:", referrer, from, amount.toString());
-        refreshAll().catch(()=>{});
-      });
-      stakingContract.on("InstantCommissionPaid", (from, to, amount) => {
-        console.log("InstantCommissionPaid", from, to, amount.toString());
-        refreshAll().catch(()=>{});
-      });
-      stakingContract.on("WithdrawalRequested", (user, id) => {
-        console.log("WithdrawalRequested", user, id);
-        refreshAll().catch(()=>{});
-      });
-    } catch (e) { /* ignore if some events don't exist */ }
-
-  } catch (e) { console.warn("listenEvents error", e); }
 }
 
-/* ======= Read-only ROI refresh (no gas) ======= */
+/* ======= EVENTS ======= */
+function listenEvents() {
+  stakingContract.removeAllListeners && stakingContract.removeAllListeners();
+  stakingContract.on("Staked", () => refreshAll());
+  stakingContract.on("Registered", () => refreshAll());
+  stakingContract.on("InstantCommissionPaid", () => refreshAll());
+  stakingContract.on("WithdrawalRequested", () => refreshAll());
+}
+
+/* ======= FORCE ROI ======= */
 async function forceUpdateROI() {
-  if (!stakingContract || !account) return;
-  try {
-    const info = await stakingContract.users(account);
-    const roiPending = fromUnits(info.roiIncome || info[5] || 0);
-    const roiEl = document.getElementById("roiPending");
-    if (roiEl) roiEl.innerText = `${toFixedNumber(roiPending, 6)} USDT`;
-    return roiPending;
-  } catch (err) {
-    console.warn("ROI refresh failed:", err && err.message ? err.message : err);
-    return 0;
-  }
+  if (!stakingContract || !account) return 0;
+  const info = await stakingContract.users(account);
+  const roi = fromUnits(info.roiIncome || info[5] || 0);
+  document.getElementById("roiPending").innerText = `${toFixedNumber(roi, 6)} USDT`;
+  return roi;
 }
 
-/* ======= REFRESH ALL: populates UI ======= */
+/* ======= REFRESH ALL ======= */
 async function refreshAll() {
   if (!stakingContract || !account) return;
-  // read-only ROI update first
-  await forceUpdateROI();
+  const rawBal = await readOnlyToken.balanceOf(account);
+  const walletBal = fromUnits(rawBal);
+  document.getElementById("walletDisplay").innerText = `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
+
+  const info = await stakingContract.users(account);
+  const staked = fromUnits(info.totalStake);
+  const roi = await forceUpdateROI();
+  const instant = fromUnits(info.instantIncome);
+  const level = fromUnits(info.levelIncome);
+  const earned = fromUnits(info.totalEarned);
+  const totalWallet = roi + instant + level;
+
+  document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
+  document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
+  document.getElementById("instantIncome").innerText = `${toFixedNumber(instant, 6)} USDT`;
+  document.getElementById("levelIncome").innerText = `${toFixedNumber(level, 6)} USDT`;
+  document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
+  document.getElementById("pkgStatus").innerText = info.isActive ? "✅ Active" : "Inactive";
 
   try {
-    // wallet token balance
-    const rawBal = await tokenContract.balanceOf(account).catch(()=>0);
-    const walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText =
-      `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
+    const days = await stakingContract.getTimeTo3x(account);
+    document.getElementById("days3x").innerText = `${days} days`;
+  } catch { document.getElementById("days3x").innerText = "N/A"; }
 
-    // Fetch fresh user info
-    const info = await stakingContract.users(account);
-    const staked = fromUnits(info.totalStake || info[1] || 0);
-    const roiPendingOnChain = fromUnits(info.roiIncome || info[5] || 0);
-    const instantIncome = fromUnits(info.instantIncome || info[6] || 0);
-    const levelIncome = fromUnits(info.levelIncome || info[7] || 0);
-    const totalEarned = fromUnits(info.totalEarned || info[3] || 0);
-    const totalWallet = roiPendingOnChain + instantIncome + levelIncome;
+  updateProgressBar(staked, staked * 3, earned);
+  await loadTeamInfo();
+  await loadWithdrawHistory();
+}
 
-    // update fields
-    document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
-    document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
-    document.getElementById("roiPending").innerText = `${toFixedNumber(roiPendingOnChain, 6)} USDT`;
-    document.getElementById("instantIncome").innerText = `${toFixedNumber(instantIncome, 6)} USDT`;
-    document.getElementById("levelIncome").innerText = `${toFixedNumber(levelIncome, 6)} USDT`;
-    document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
+/* ======= TEAM INFO ======= */
+async function loadTeamInfo() {
+  if (!readOnlyStaking || !account) return;
+  const iface = readOnlyStaking.interface;
+  const filter = readOnlyStaking.filters.Registered(null, account);
+  const logs = await provider.getLogs({ address: CONFIG.stakingAddress, fromBlock: 0, toBlock: "latest", topics: filter.topics });
+  const directs = logs.map(l => iface.parseLog(l).args[0]);
+  let directCount = directs.length, indirectCount = 0, active = 0, inactive = 0;
 
-    document.getElementById("pkgStatus").innerText = info.isActive ? "✅ Active" : "Inactive";
-
-    // Days to 3x (call view)
-    try {
-      const daysBn = await stakingContract.getTimeTo3x(account).catch(()=>0);
-      document.getElementById("days3x").innerText = (Number(daysBn) || 0) + " days";
-    } catch (e) { document.getElementById("days3x").innerText = "N/A"; }
-
-    // Direct & indirect team (safe fallback if contract doesn't expose helper)
-    let directCount = 0, indirectCount = 0, active = 0, inactive = 0, teamBusiness = 0;
-    try {
-      // prefer `getDirectRefs` if present
-      if (stakingContract.getDirectRefs) {
-        const directs = await stakingContract.getDirectRefs(account).catch(()=>[]);
-        directCount = directs.length;
-        for (const d of directs) {
-          const dInfo = await stakingContract.users(d).catch(()=>null);
-          const st = dInfo ? fromUnits(dInfo.totalStake || dInfo[1]) : 0;
-          teamBusiness += st;
-          if (st > 0) active++; else inactive++;
-          // count second level as indirect
-          if (stakingContract.getDirectRefs) {
-            const subs = await stakingContract.getDirectRefs(d).catch(()=>[]);
-            indirectCount += subs.length;
-            for (const s of subs) {
-              const sInfo = await stakingContract.users(s).catch(()=>null);
-              teamBusiness += sInfo ? fromUnits(sInfo.totalStake || sInfo[1]) : 0;
-            }
-          }
-        }
-      } else {
-        // fallback: direct count unknown; keep zero
-        directCount = 0;
-        indirectCount = 0;
-      }
-    } catch (e) {
-      console.warn("team fetch error", e);
-    }
-
-    document.getElementById("directCount").innerText = directCount;
-    document.getElementById("indirectCount").innerText = indirectCount;
-    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
-    if (document.getElementById("teamBusiness")) {
-      document.getElementById("teamBusiness").innerText = `${toFixedNumber(teamBusiness, 6)} USDT`;
-    }
-
-    // Level unlock UI
-    const rows = document.querySelectorAll("#levelsTbody tr");
-    rows.forEach((r, i) => {
-      const cell = r.querySelector("td:last-child");
-      if (!cell) return;
-      if (i < Math.min(directCount, 10)) {
-        cell.innerText = "Open ✅"; cell.style.color = "#00FF90"; cell.style.fontWeight = "600";
-      } else {
-        cell.innerText = "Pending"; cell.style.color = ""; cell.style.fontWeight = "";
-      }
-    });
-
-    // Update progress bar using totalEarned and staked*3 target
-    updateProgressBar(staked, staked * 3, totalEarned);
-
-    // load withdraw history asynchronously
-    loadWithdrawHistory().catch(()=>{});
-
-    // start live ROI timer (merge on-chain + off-chain growth)
-    await startLiveROI();
-
-  } catch (e) {
-    console.error("refreshAll error:", e);
+  for (const d of directs) {
+    const info = await readOnlyStaking.users(d);
+    if (fromUnits(info.totalStake) > 0) active++; else inactive++;
+    const flt = readOnlyStaking.filters.Registered(null, d);
+    const logs2 = await provider.getLogs({ address: CONFIG.stakingAddress, fromBlock: 0, toBlock: "latest", topics: flt.topics });
+    indirectCount += logs2.length;
   }
-}
-</script>
-<!-- ======= END PART 3/4 ======= -->
-<!-- ======= SCRIPT PART 4/4 ======= -->
-<script>
-/* ======= TEAM info helper (lighter) ======= */
-async function loadTeamInfo(){
-  try {
-    if (!stakingContract || !account) return;
-    // refreshAll already loads & updates team
-    await refreshAll();
-  } catch (e) { console.warn("loadTeamInfo error", e); }
+
+  document.getElementById("directCount").innerText = directCount;
+  document.getElementById("indirectCount").innerText = indirectCount;
+  document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
+  // update levels
+  const rows = document.querySelectorAll("#levelsTbody tr");
+  rows.forEach((r, i) => {
+    const cell = r.querySelector("td:last-child");
+    if (i < Math.min(directCount, 10)) { cell.innerText = "Open ✅"; cell.style.color = "#00ff90"; }
+    else { cell.innerText = "Pending"; cell.style.color = ""; }
+  });
 }
 
-/* ======= simple register helper (optional) ======= */
-async function ensureRegistered(referrerAddr) {
-  try {
-    const isReg = await stakingContract.registered(account).catch(()=>false);
-    if (isReg) return true;
-    const ref = (referrerAddr && ethers.utils.isAddress(referrerAddr)) ? referrerAddr : ethers.constants.AddressZero;
-    const tx = await stakingContract.register(ref);
-    await tx.wait();
-    return true;
-  } catch (e) { console.warn("ensureRegistered failed:", e); return false; }
-}
-
-/* ======= Withdraw history (replaced + improved) ======= */
+/* ======= WITHDRAW HISTORY ======= */
 async function loadWithdrawHistory() {
-  const tbody = document.getElementById('withdrawHistoryBody');
+  const tbody = document.getElementById("withdrawHistoryBody");
   tbody.innerHTML = '<tr><td colspan="4" class="center muted">Loading...</td></tr>';
-  if (!stakingContract || !account) return;
   try {
-    const totalBn = await stakingContract.nextWithdrawId().catch(()=>0);
-    const total = Number(totalBn || 0);
+    const total = await stakingContract.nextWithdrawId();
     let html = "";
     for (let i = total - 1; i >= 1; i--) {
-      const req = await stakingContract.withdrawals(i).catch(()=>null);
-      if (!req || !req.user) continue;
+      const req = await stakingContract.withdrawals(i);
       if (req.user.toLowerCase() !== account.toLowerCase()) continue;
-      const time = new Date(Number(req.timestamp)*1000).toLocaleString();
-      const amount = fromUnits(req.amount);
+      const time = new Date(Number(req.timestamp) * 1000).toLocaleString();
+      const amt = fromUnits(req.amount);
       const status = req.approved ? "✅ Approved" : "⏳ Pending";
-      html += `<tr>
-        <td>${time}</td>
-        <td>${toFixedNumber(amount, 2)} USDT</td>
-        <td>${status}</td>
-        <td>${i}</td>
-      </tr>`;
+      html += `<tr><td>${time}</td><td>${toFixedNumber(amt, 2)} USDT</td><td>${status}</td><td>${i}</td></tr>`;
     }
     tbody.innerHTML = html || '<tr><td colspan="4" class="center muted">No history yet.</td></tr>';
-  } catch(e) {
-    console.error("Withdraw history error:", e);
-    tbody.innerHTML = '<tr><td colspan="4" class="center muted">Error loading history</td></tr>';
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="4" class="center muted">Error</td></tr>';
   }
 }
 
-/* ======= LIVE ROI UPDATER (per-second growth) ======= */
-async function startLiveROI() {
-  if (!stakingContract || !account) return;
-  try {
-    // clear old timer
-    if (liveROITimer) { clearInterval(liveROITimer); liveROITimer = null; }
-
-    // fetch on-chain values
-    const info = await stakingContract.users(account).catch(()=>null);
-    if (!info) return;
-    const staked = fromUnits(info.totalStake || info[1] || 0);
-    const roiIncome = fromUnits(info.roiIncome || info[5] || 0);
-    const lastUpdate = Number(info.lastRoiUpdate || info[4] || Math.floor(Date.now()/1000));
-    const dailyRoiPercent = 1; // default 1% (matches contract default dailyROIbps=100)
-    // calc per-second extra from lastUpdate
-    function calcLiveValue() {
-      const now = Math.floor(Date.now() / 1000);
-      const delta = Math.max(0, now - lastUpdate);
-      const extra = (staked * dailyRoiPercent * delta) / (100 * 86400);
-      const live = roiIncome + extra;
-      const roiEl = document.getElementById("roiPending");
-      if (roiEl) roiEl.innerText = `${toFixedNumber(live, 6)} USDT`;
-    }
-
-    calcLiveValue();
-    liveROITimer = setInterval(calcLiveValue, 1000);
-  } catch (err) {
-    console.warn("Live ROI error:", err);
-  }
-}
-
-/* ======= accounts/chain listeners ======= */
+/* ======= META EVENTS ======= */
 if (window.ethereum) {
-  window.ethereum.on("accountsChanged", (accs) => {
-    if (accs.length === 0) {
-      document.getElementById("walletDisplay").innerText = "Not connected";
-      localStorage.removeItem("staking_connected");
-      // stop timers
-      if (liveROITimer) { clearInterval(liveROITimer); liveROITimer = null; }
-    } else {
-      // reload to re-init with new account
-      location.reload();
-    }
-  });
-  window.ethereum.on("chainChanged", () => { location.reload(); });
+  window.ethereum.on("accountsChanged", () => location.reload());
+  window.ethereum.on("chainChanged", () => location.reload());
 }
 
-/* ======= INITIAL LOG ======= */
-console.log("Staking DApp patched: UI handlers + live ROI + progress + history integrated.");
+console.log("✅ Full upgraded DApp JS loaded successfully.");
 </script>
-<!-- ======= END PART 4/4 ======= -->
