@@ -332,7 +332,10 @@ function attachHandlers(){
   };
 
   document.getElementById("refreshBtn").onclick=refreshAll;
-  document.getElementById("showTeam").onclick=loadTeamInfo;
+  document.getElementById("showTeam").onclick = async () => {
+  await loadTeamInfo();
+  alert("Team data refreshed (see UI)");
+};
   document.getElementById("copyLink").onclick=async()=>{
     await navigator.clipboard.writeText(document.getElementById("refLink").value);
     alert("Link copied!");
