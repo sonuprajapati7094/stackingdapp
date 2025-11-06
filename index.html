@@ -719,9 +719,7 @@ if (window.ethereum) {
     if (accs.length === 0) {
       document.getElementById("walletDisplay").innerText = "Not connected";
       localStorage.removeItem("staking_connected");
-      // stop timers
-      if (liveROITimer) { clearInterval(liveROITimer); liveROITimer = null; }
-    } else {
+      
       // reload to re-init with new account
       location.reload();
     }
