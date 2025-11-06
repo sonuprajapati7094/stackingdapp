@@ -448,48 +448,40 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-/* ======= loadTeamInfo (Universal + Optimized Version) ======= */
 async function loadTeamInfo() {
   try {
     if (!stakingContract || !account) return;
 
     console.log("🔍 Loading team (universal safe mode)...");
 
-    // STEP 1: Fetch team from blockchain events
+    // 1️⃣ Pehle LocalStorage se load karne ki koshish
+    const key = "team_" + account.toLowerCase();
+    let teamList = JSON.parse(localStorage.getItem(key) || "[]");
+
+    // Agar localStorage me data hai, usey UI me dikha de
+    if (teamList.length > 0) {
+      console.log("📦 Found team in localStorage:", teamList.length);
+      await updateTeamUI(teamList);
+      return; // blockchain fetch ki zarurat nahi
+    }
+
+    // 2️⃣ Nahi mila to blockchain events se fetch kare
+    console.log("🌐 Fetching from blockchain...");
     const { directs, indirects } = await getTeamFromEvents(account);
-    console.log(`🧩 Network tree built for ${account} → ${directs.length} directs, ${indirects.length} indirects`);
 
-    // STEP 2: Cache in localStorage for reload speed
-    localStorage.setItem("team_" + account.toLowerCase(), JSON.stringify(directs));
-
-    // STEP 3: Real-time listener (new joins)
-    if (!window._teamListenerAdded) {
-      window._teamListenerAdded = true;
-      stakingContract.on("Registered", async (user, ref) => {
-        if (ref.toLowerCase() === account.toLowerCase()) {
-          console.log("🟢 New direct joined:", user);
-          if (!directs.includes(user.toLowerCase())) {
-            directs.push(user.toLowerCase());
-            localStorage.setItem("team_" + account.toLowerCase(), JSON.stringify(directs));
-            await updateTeamUI(directs);
-          }
-        }
-      });
+    // Save in localStorage for next reload
+    if (directs.length > 0) {
+      localStorage.setItem(key, JSON.stringify(directs));
     }
 
-    // STEP 4: If koi old directs nahi mile to warn only
-    if (directs.length === 0) {
-      console.log("⚠️ No directs found from blockchain — may be new user or no referrals yet.");
-    }
-
-    // STEP 5: Update UI now
+    // Update UI
     await updateTeamUI(directs);
-
     console.log(`✅ Team updated — Directs: ${directs.length}, Indirects: ${indirects.length}`);
   } catch (err) {
     console.error("⚠️ loadTeamInfo error (safe mode):", err.message || err);
   }
 }
+
 
 /* ========== STEP 2: Event-based Team Scanner ========== */
 
@@ -564,7 +556,7 @@ async function getTeamFromEvents(account) {
 async function updateTeamUI(teamArr) {
   try {
     const directs = teamArr || [];
-    
+
     const directCount = directs.length;
     let active = 0, inactive = 0;
 
