@@ -489,6 +489,7 @@ console.log(`✅ Team updated — Directs: ${directs.length}, Indirects: ${indir
 }
 
 /* ========== STEP 2: Event-based Team Scanner ========== */
+
 async function getTeamFromEvents(account) {
   try {
     const iface = new ethers.utils.Interface(STAKING_ABI);
@@ -555,6 +556,61 @@ async function getTeamFromEvents(account) {
     return { directs: [], indirects: [] };
   }
 }
+
+// ====== TEAM UI UPDATE (required for getTeamFromEvents) ======
+async function updateTeamUI(teamList) {
+  try {
+    const directs = teamList || [];
+    const directCount = directs.length;
+    let active = 0, inactive = 0;
+
+    for (const d of directs) {
+      try {
+        let info = await stakingContract.users(d).catch(() => null);
+        if (!info) {
+          await new Promise(res => setTimeout(res, 500));
+          info = await stakingContract.users(d).catch(() => null);
+        }
+        if (!info) {
+          console.log("⚠️ No data for", d, "→ assuming active (fallback)");
+          active++;
+          continue;
+        }
+        const st = fromUnits(info.totalStake || info[2] || 0);
+        const isAct = info.isActive || st > 0;
+        if (isAct) active++;
+        else inactive++;
+      } catch (err) {
+        console.warn("User fetch failed:", err);
+        active++;
+      }
+    }
+
+    document.getElementById("directCount").innerText = directCount;
+    document.getElementById("indirectCount").innerText = 0;
+    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+
+    const rows = document.querySelectorAll("#levelsTbody tr");
+    rows.forEach((r, i) => {
+      const cell = r.querySelector("td:last-child");
+      if (!cell) return;
+      if (i < Math.min(directCount, 10)) {
+        cell.innerText = "Open ✅";
+        cell.style.color = "#00FF90";
+        cell.style.fontWeight = "600";
+      } else {
+        cell.innerText = "Pending";
+        cell.style.color = "";
+        cell.style.fontWeight = "";
+      }
+    });
+
+    console.log(`✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`);
+  } catch (e) {
+    console.error("updateTeamUI error:", e);
+  }
+}
+
 
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
