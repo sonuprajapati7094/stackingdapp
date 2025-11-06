@@ -561,9 +561,9 @@ async function getTeamFromEvents(account) {
 }
 
 // ====== TEAM UI UPDATE (required for getTeamFromEvents) ======
-async function updateTeamUI(teamList) {
+async function updateTeamUI(directs) {
   try {
-    const directs = teamList || [];
+    const directs = directs || [];
     const directCount = directs.length;
     let active = 0, inactive = 0;
 
