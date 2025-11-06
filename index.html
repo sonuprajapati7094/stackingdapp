@@ -448,144 +448,108 @@ async function refreshAll(){
   await loadWithdrawHistory();
 }
 
-async function loadTeamInfo() {
-  try {
-    if (!stakingContract || !account) return;
-
-    console.log("🔍 Loading team (universal safe mode)...");
-
-    // 1️⃣ Pehle LocalStorage se load karne ki koshish
-    const key = "team_" + account.toLowerCase();
-    let teamList = JSON.parse(localStorage.getItem(key) || "[]");
-
-    // Agar localStorage me data hai, usey UI me dikha de
-    if (teamList.length > 0) {
-      console.log("📦 Found team in localStorage:", teamList.length);
-      await updateTeamUI(teamList);
-      return; // blockchain fetch ki zarurat nahi
-    }
-
-    // 2️⃣ Nahi mila to blockchain events se fetch kare
-    console.log("🌐 Fetching from blockchain...");
-    const { directs, indirects } = await getTeamFromEvents(account);
-
-    // Save in localStorage for next reload
-    if (directs.length > 0) {
-      localStorage.setItem(key, JSON.stringify(directs));
-    }
-
-    // Update UI
-    await updateTeamUI(directs);
-    console.log(`✅ Team updated — Directs: ${directs.length}, Indirects: ${indirects.length}`);
-  } catch (err) {
-    console.error("⚠️ loadTeamInfo error (safe mode):", err.message || err);
-  }
-}
-
-
-/* ========== STEP 2: Event-based Team Scanner ========== */
-
+// ===== getTeamFromEvents (level-10 BFS from Registered events) =====
 async function getTeamFromEvents(account) {
   try {
-    const iface = new ethers.utils.Interface(STAKING_ABI);
-    const topic = iface.getEventTopic("Registered");
+    if (!provider || !CONFIG || !CONFIG.stakingAddress) return { levels: [] };
 
-    // Scan past logs for registration events
+    const STAKING_ADDRESS = CONFIG.stakingAddress;
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const registeredTopic = iface.getEventTopic("Registered");
+
+    // fetch logs - heavy on mainnet; change fromBlock if needed
     const logs = await provider.getLogs({
-      address: CONFIG.stakingAddress,
       fromBlock: 0,
       toBlock: "latest",
-      topics: [topic],
+      address: STAKING_ADDRESS,
+      topics: [registeredTopic],
     });
 
-    // Parse logs → make referral map
-    const refMap = {};
-    logs.forEach((log) => {
+    const childrenMap = new Map();
+    for (const log of logs) {
       try {
         const parsed = iface.parseLog(log);
-        const { user, referrer } = parsed.args;
-        refMap[user.toLowerCase()] = referrer.toLowerCase();
-      } catch (err) {
-        console.warn("Log parse fail:", err);
-      }
-    });
-
-    // Now recursively count directs + indirects for this user
-    const directs = [];
-    const indirects = new Set();
-
-    // Find directs
-    for (const [user, ref] of Object.entries(refMap)) {
-      if (ref === account.toLowerCase()) directs.push(user);
-    }
-
-    // Find indirects (anyone whose chain leads back to user)
-    function isIndirect(u) {
-      let r = refMap[u];
-      let depth = 0;
-      while (r && depth < 20) {
-        if (r === account.toLowerCase()) return true;
-        r = refMap[r];
-        depth++;
-      }
-      return false;
-    }
-
-    for (const [user, ref] of Object.entries(refMap)) {
-      if (isIndirect(user) && ref !== account.toLowerCase()) {
-        indirects.add(user);
+        const user = String(parsed.args.user || parsed.args[0] || "").toLowerCase();
+        const refAddr = String(parsed.args.referrer || parsed.args.ref || parsed.args[1] || ethers.constants.AddressZero).toLowerCase();
+        if (!childrenMap.has(refAddr)) childrenMap.set(refAddr, new Set());
+        childrenMap.get(refAddr).add(user);
+      } catch (e) {
+        // ignore unparsable logs
+        continue;
       }
     }
 
-    console.log(`🧩 Network tree built for ${account} → ${directs.length} directs, ${indirects.size} indirects`);
+    // BFS upto 10 levels
+    const maxLevels = 10;
+    const levels = [];
+    const seen = new Set();
+    const root = account.toLowerCase();
 
-    // Cache for next reload
-    localStorage.setItem(
-      "team_" + account.toLowerCase(),
-      JSON.stringify({ directs, _indirectCount: indirects.size })
-    );
+    const l1 = childrenMap.has(root) ? Array.from(childrenMap.get(root)) : [];
+    levels.push(l1);
+    l1.forEach(a => seen.add(a));
 
-    return { directs, indirects: Array.from(indirects) };
+    for (let lvl = 2; lvl <= maxLevels; lvl++) {
+      const prev = levels[lvl - 2] || [];
+      if (!prev.length) { levels.push([]); continue; }
+      const thisLevel = [];
+      for (const parent of prev) {
+        const kids = childrenMap.get(parent) || new Set();
+        for (const k of kids) {
+          if (!seen.has(k) && k !== root) {
+            seen.add(k);
+            thisLevel.push(k);
+          }
+        }
+      }
+      levels.push(thisLevel);
+    }
+
+    console.log(`✅ getTeamFromEvents: levels built — [${levels.map(l=>l.length).join(", ")}]`);
+    return { levels };
   } catch (err) {
     console.error("getTeamFromEvents error:", err);
-    return { directs: [], indirects: [] };
+    return { levels: [] };
   }
 }
 
-// ====== TEAM UI UPDATE (required for getTeamFromEvents) ======
-async function updateTeamUI(teamArr) {
+// ===== updateTeamUI =====
+async function updateTeamUI(levels) {
   try {
-    const directs = teamArr || [];
+    const lvlArr = levels || [];
+    const directList = lvlArr[0] || [];
+    const indirectList = [].concat(...(lvlArr.slice(1)));
+    const directCount = directList.length;
+    const indirectCount = indirectList.length;
 
-    const directCount = directs.length;
     let active = 0, inactive = 0;
+    const combined = [...directList, ...indirectList];
 
-    for (const d of directs) {
+    for (const addr of combined) {
       try {
-        let info = await stakingContract.users(d).catch(() => null);
+        const info = await stakingContract.users(addr).catch(()=>null);
         if (!info) {
-          await new Promise(res => setTimeout(res, 500));
-          info = await stakingContract.users(d).catch(() => null);
-        }
-        if (!info) {
-          console.log("⚠️ No data for", d, "→ assuming active (fallback)");
+          // fallback: assume active if we can't fetch
           active++;
           continue;
         }
         const st = fromUnits(info.totalStake || info[2] || 0);
-        const isAct = info.isActive || st > 0;
-        if (isAct) active++;
-        else inactive++;
-      } catch (err) {
-        console.warn("User fetch failed:", err);
+        const isAct = (info.isActive === true) || (st > 0);
+        if (isAct) active++; else inactive++;
+      } catch (e) {
+        console.warn("updateTeamUI: user fetch failed", addr, e);
         active++;
       }
     }
 
-    document.getElementById("directCount").innerText = directCount;
-    document.getElementById("indirectCount").innerText = 0;
-    document.getElementById("activeCounts").innerText = `${active} / ${inactive}`;
+    const directEl = document.getElementById("directCount");
+    const indirectEl = document.getElementById("indirectCount");
+    const activeEl = document.getElementById("activeCounts");
+    if (directEl) directEl.innerText = directCount;
+    if (indirectEl) indirectEl.innerText = indirectCount;
+    if (activeEl) activeEl.innerText = `${active} / ${inactive}`;
 
+    // update level rows visual
     const rows = document.querySelectorAll("#levelsTbody tr");
     rows.forEach((r, i) => {
       const cell = r.querySelector("td:last-child");
@@ -601,9 +565,64 @@ async function updateTeamUI(teamArr) {
       }
     });
 
-    console.log(`✅ Team updated — Directs: ${directCount}, Active: ${active}, Inactive: ${inactive}`);
+    console.log(`✅ Team updated — Directs: ${directCount}, Indirects: ${indirectCount}, Active: ${active}, Inactive: ${inactive}`);
   } catch (e) {
     console.error("updateTeamUI error:", e);
+  }
+}
+
+// ===== loadTeamInfo (tries onchain -> cache -> empty) =====
+async function loadTeamInfo() {
+  try {
+    if (!stakingContract || !account) return;
+    console.log("🔍 Loading team (universal safe mode)...");
+
+    // Prefer onchain
+    try {
+      console.log("🟦 Fetching from blockchain...");
+      const { levels } = await getTeamFromEvents(account);
+      try {
+        const key = "team_levels_" + account.toLowerCase();
+        localStorage.setItem(key, JSON.stringify(levels));
+      } catch(e){}
+      await updateTeamUI(levels);
+
+      // add real-time listener once
+      if (!window._teamListenerAdded) {
+        window._teamListenerAdded = true;
+        try {
+          stakingContract.on("Registered", async (user, referrer) => {
+            try {
+              const { levels: newLevels } = await getTeamFromEvents(account);
+              const key = "team_levels_" + account.toLowerCase();
+              localStorage.setItem(key, JSON.stringify(newLevels));
+              await updateTeamUI(newLevels);
+            } catch(e){ console.warn("Registered event handler err:", e); }
+          });
+        } catch(e){ console.warn("Listener attach failed:", e); }
+      }
+
+      return;
+    } catch (chainErr) {
+      console.warn("Fetching team from blockchain failed:", chainErr);
+    }
+
+    // fallback: cache
+    try {
+      const key = "team_levels_" + account.toLowerCase();
+      const raw = localStorage.getItem(key);
+      const cached = raw ? JSON.parse(raw) : [];
+      if (cached && cached.length) {
+        console.log("🟨 Using cached team levels");
+        await updateTeamUI(cached);
+        return;
+      }
+    } catch (e) { console.warn("team cache read failed", e); }
+
+    console.log("⚠️ No team data (onchain & cache empty)");
+    await updateTeamUI([]);
+  } catch (e) {
+    console.error("🔺 loadTeamInfo error (safe mode):", e);
   }
 }
 
