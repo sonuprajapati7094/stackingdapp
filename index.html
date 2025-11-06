@@ -401,7 +401,7 @@ function attachUIHandlers(){
       await tx.wait();
       alert("Stake successful ✔");
       await refreshAll();
-      await startLiveROI();
+  
     } catch (e) {
       console.error("Stake failed:", e);
       const msg = e?.error?.message || e?.data?.message || e?.message || e;
@@ -425,7 +425,7 @@ function attachUIHandlers(){
 
       // refresh UI so wallet balance deducts and dashboard updates
       await refreshAll();
-      await startLiveROI();
+     
     } catch (e) {
       console.error("StakeFor failed:", e);
       alert("P2P stake failed: " + (e?.message || e));
@@ -445,7 +445,7 @@ function attachUIHandlers(){
 
       // refresh balances and live ROI
       await refreshAll();
-      await startLiveROI();
+ 
     } catch (e) {
       console.error("Withdraw failed:", e);
       alert("Withdraw failed: " + (e?.message || e));
@@ -621,7 +621,7 @@ async function refreshAll() {
     loadWithdrawHistory().catch(()=>{});
 
     // start live ROI timer (merge on-chain + off-chain growth)
-    await startLiveROI();
+  
 
   } catch (e) {
     console.error("refreshAll error:", e);
