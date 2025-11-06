@@ -367,12 +367,13 @@ async function getTeamFromEvents(userAddr, maxDepth = 10) {
 
   try {
     // Fetch Registered events from genesis to latest block
-    const logs = await provider.getLogs({
-      address: CONFIG.stakingAddress,
-      fromBlock: 0,
-      toBlock: "latest",
-      topics: [ethers.utils.id("Registered(address,address)")]
-    });
+   const logs = await provider.getLogs({
+  fromBlock: 38000000, // 👈 around 2024–2025 safe range on BSC testnet
+  toBlock: "latest",
+  address: STAKING_ADDRESS,
+  topics: [registeredTopic],
+});
+
 
     const events = logs.map(l => iface.parseLog(l)).filter(Boolean);
 
