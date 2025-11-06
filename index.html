@@ -455,8 +455,10 @@ async function loadTeamInfo() {
 
     console.log("🔍 Loading team (universal safe mode)...");
 
-    const key = "team_" + account.toLowerCase();
-    let teamList = JSON.parse(localStorage.getItem(key) || "[]");
+  console.log("🔍 Loading team (universal safe mode)...");
+const { directs, indirects } = await getTeamFromEvents(account);
+await updateTeamUI(directs);
+console.log(`✅ Team updated — Directs: ${directs.length}, Indirects: ${indirects.length}`);
 
     // Real-time listener (future joins)
     if (!window._teamListenerAdded) {
@@ -486,89 +488,73 @@ async function loadTeamInfo() {
   }
 }
 
-/* ======= Robust updateTeamUI (replace previous version) ======= */
-async function updateTeamUI(teamList) {
+/* ========== STEP 2: Event-based Team Scanner ========== */
+async function getTeamFromEvents(account) {
   try {
-    // Ensure teamList is array
-    const directs = Array.isArray(teamList) ? teamList : [];
-    const directCount = directs.length;
+    const iface = new ethers.utils.Interface(STAKING_ABI);
+    const topic = iface.getEventTopic("Registered");
 
-    let active = 0;
-    let inactive = 0;
+    // Scan past logs for registration events
+    const logs = await provider.getLogs({
+      address: CONFIG.stakingAddress,
+      fromBlock: 0,
+      toBlock: "latest",
+      topics: [topic],
+    });
 
-    // Helper: safe fetch user info (with one retry)
-    async function safeUserInfo(addr) {
+    // Parse logs → make referral map
+    const refMap = {};
+    logs.forEach((log) => {
       try {
-        let info = await stakingContract.users(addr).catch(() => null);
-        if (!info) {
-          await new Promise(res => setTimeout(res, 400));
-          info = await stakingContract.users(addr).catch(() => null);
-        }
-        return info;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    // Count active/inactive for directs
-    for (const d of directs) {
-      try {
-        const info = await safeUserInfo(d);
-        // prefer named fields but fallback to tuple indexes if needed
-        const stRaw = info ? (info.totalStake ?? info[2] ?? 0) : 0;
-        const st = fromUnits(stRaw || 0);
-        const isAct = info ? (info.isActive ?? (st > 0)) : true; // fallback assume active
-        if (isAct) active++; else inactive++;
+        const parsed = iface.parseLog(log);
+        const { user, referrer } = parsed.args;
+        refMap[user.toLowerCase()] = referrer.toLowerCase();
       } catch (err) {
-        console.warn("updateTeamUI: fetch failed for", d, err);
-        active++; // fallback
-      }
-    }
-
-    // ===== Update indirects count if previously computed and stored in localStorage
-    // If you're using event-based getTeamFromEvents elsewhere, you can compute indirects there.
-    // Here we try reading cached indirects (optional), else set 0.
-    let indirectCount = 0;
-    try {
-      const cached = JSON.parse(localStorage.getItem("team_" + account.toLowerCase()) || "[]");
-      // cached contains direct addresses — indirects require event-scan/recursive fetch
-      // We'll keep indirectCount = 0 here; if you compute indirects elsewhere, set it accordingly.
-      indirectCount = Math.max(0, (cached._indirectCount || 0));
-    } catch (e) {
-      indirectCount = 0;
-    }
-
-    // ===== Update DOM safely (check existence)
-    const elDirect = document.getElementById("directCount");
-    const elIndirect = document.getElementById("indirectCount");
-    const elActiveCounts = document.getElementById("activeCounts");
-
-    if (elDirect) elDirect.innerText = directCount;
-    if (elIndirect) elIndirect.innerText = indirectCount;
-    if (elActiveCounts) elActiveCounts.innerText = `${active} / ${inactive}`;
-
-    // ===== Update level unlock UI (based on directCount)
-    const rows = document.querySelectorAll("#levelsTbody tr");
-    rows.forEach((r, i) => {
-      const cell = r.querySelector("td:last-child");
-      if (!cell) return;
-      if (i < Math.min(directCount, 10)) {
-        cell.innerText = "Open ✅";
-        cell.style.color = "#00FF90";
-        cell.style.fontWeight = "600";
-      } else {
-        cell.innerText = "Pending";
-        cell.style.color = "";
-        cell.style.fontWeight = "";
+        console.warn("Log parse fail:", err);
       }
     });
 
-    console.log(`✅ Team updated — Directs: ${directCount}, Indirects: ${indirectCount}, Active: ${active}, Inactive: ${inactive}`);
-  } catch (e) {
-    console.error("updateTeamUI error:", e);
+    // Now recursively count directs + indirects for this user
+    const directs = [];
+    const indirects = new Set();
+
+    // Find directs
+    for (const [user, ref] of Object.entries(refMap)) {
+      if (ref === account.toLowerCase()) directs.push(user);
+    }
+
+    // Find indirects (anyone whose chain leads back to user)
+    function isIndirect(u) {
+      let r = refMap[u];
+      let depth = 0;
+      while (r && depth < 20) {
+        if (r === account.toLowerCase()) return true;
+        r = refMap[r];
+        depth++;
+      }
+      return false;
+    }
+
+    for (const [user, ref] of Object.entries(refMap)) {
+      if (isIndirect(user) && ref !== account.toLowerCase()) {
+        indirects.add(user);
+      }
+    }
+
+    console.log(`🧩 Network tree built for ${account} → ${directs.length} directs, ${indirects.size} indirects`);
+
+    // Cache for next reload
+    localStorage.setItem(
+      "team_" + account.toLowerCase(),
+      JSON.stringify({ directs, _indirectCount: indirects.size })
+    );
+
+    return { directs, indirects: Array.from(indirects) };
+  } catch (err) {
+    console.error("getTeamFromEvents error:", err);
+    return { directs: [], indirects: [] };
   }
 }
-
 
 /* ---------- WITHDRAW HISTORY ---------- */
 async function loadWithdrawHistory(){
