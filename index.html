@@ -448,62 +448,37 @@ function attachUIHandlers(){
     }
   };
 
-// withdraw
-document.getElementById("requestWithdraw").onclick = async () => {
-  try {
-    if (!stakingContract) return alert("Connect wallet first");
-    const amt = document.getElementById("withdrawAmt").value;
-    if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
-    const units = toUnits(amt);
-
-    let txSuccess = false;
+  // Request Withdraw
+  document.getElementById("requestWithdraw").onclick = async () => {
     try {
+      if (!stakingContract) return alert("Connect wallet first");
+      const amt = document.getElementById("withdrawAmt").value;
+      if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
+      const units = toUnits(amt);
+
       const tx = await stakingContract.requestWithdrawal(units);
-      await tx.wait();
-      txSuccess = true;
-    } catch (err) {
-      console.warn("⚠️ MetaMask TX failed or user rejected:", err?.message || err);
+      const rec = await tx.wait();
+
+   // On success, immediately deduct from Total Wallet (frontend only)
+const withdrawVal = Number(document.getElementById("withdrawAmt").value);
+const twElem = document.getElementById("totalWallet");
+if (twElem && withdrawVal) {
+  const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.-]+/g,"")) || 0;
+  const newVal = Math.max(0, oldVal - withdrawVal);
+  twElem.innerText = `${newVal.toFixed(6)} USDT`;
+}
+// Add to history instantly
+toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+addLocalWithdrawPending(rec);
+await refreshAll();
+
+
+    } catch (e) {
+      console.error("Withdraw failed:", e);
+      const msg = e?.error?.message || e?.data?.message || e?.message || e;
+      alert("Withdraw failed: " + String(msg).slice(0,300));
     }
-
-    // ✅ Always deduct from Total Wallet (even if TX fails frontend-only)
-    const withdrawVal = Number(amt);
-    const twElem = document.querySelector("#totalWallet");
-    if (twElem && !isNaN(withdrawVal)) {
-      const oldValStr = (twElem.innerText || "").replace(/[^\d.]/g, "").trim();
-      const oldVal = parseFloat(oldValStr) || 0;
-      const newVal = Math.max(0, oldVal - withdrawVal);
-      twElem.innerText = `${newVal.toFixed(6)} USDT`;
-      console.log(`💰 Total Wallet updated (${oldVal} → ${newVal})`);
-    } else {
-      console.warn("⚠️ totalWallet element not found or withdrawVal invalid");
-    }
-
-    // ✅ UI feedback
-    if (txSuccess) {
-      toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
-      document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
-    } else {
-      toast(`Frontend deduction only (-${withdrawVal} USDT)`);
-      document.getElementById("withdrawStatus").innerText = "Withdraw simulated (frontend only)";
-    }
-
-    // ✅ Add to local history immediately
-    if (typeof addLocalWithdrawPending === "function") {
-      addLocalWithdrawPending({ amount: amt, approved: txSuccess, timestamp: Date.now() });
-    }
-
-    // ✅ Delay refresh to preserve visible deduction
-    setTimeout(async () => {
-      await refreshAll();
-    }, 2000);
-
-  } catch (e) {
-    console.error("Withdraw failed:", e);
-    const msg = e?.error?.message || e?.data?.message || e?.message || e;
-    alert("Withdraw failed: " + String(msg).slice(0, 300));
-  }
-};
-
+  };
 
   // Copy referral
   document.getElementById("copyLink").onclick = async () => {
@@ -752,3 +727,4 @@ if (window.ethereum) {
 <!-- ======= END ======= -->
 </body>
 </html>
+
