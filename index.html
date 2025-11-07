@@ -459,10 +459,19 @@ function attachUIHandlers(){
       const tx = await stakingContract.requestWithdrawal(units);
       const rec = await tx.wait();
 
-      // On success, we immediately show pending deduction and push history row
-      toast("Withdrawal requested ✔");
-      addLocalWithdrawPending(rec); // add entry to history UI immediately
-      await refreshAll();
+   // On success, immediately deduct from Total Wallet (frontend only)
+const withdrawVal = Number(document.getElementById("withdrawAmt").value);
+const twElem = document.getElementById("totalWallet");
+if (twElem && withdrawVal) {
+  const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.-]+/g,"")) || 0;
+  const newVal = Math.max(0, oldVal - withdrawVal);
+  twElem.innerText = `${newVal.toFixed(6)} USDT`;
+}
+// Add to history instantly
+toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+addLocalWithdrawPending(rec);
+await refreshAll();
+
 
     } catch (e) {
       console.error("Withdraw failed:", e);
