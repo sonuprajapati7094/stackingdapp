@@ -353,11 +353,14 @@ async function loadWithdrawQueue() {
       };
     });
     document.querySelectorAll(".viewBtn").forEach(btn => {
-      btn.onclick = async (ev) => {
-        const id = Number(ev.currentTarget.getAttribute("data-id"));
-        window.open(`${location.origin}${location.pathname.replace(/\\/admin\\.html$/,'/index.html')}?showWithdrawId=${id}`, "_blank");
-      };
-    });
+  btn.onclick = async (ev) => {
+    const id = Number(ev.currentTarget.getAttribute("data-id"));
+    // ✅ fixed regex & clean path replace
+    const base = location.origin + location.pathname.replace(/\/admin\.html$/, '/index.html');
+    window.open(`${base}?showWithdrawId=${id}`, "_blank");
+  };
+});
+
 
   } catch (e) {
     console.error("loadWithdrawQueue error", e);
