@@ -456,38 +456,46 @@ document.getElementById("requestWithdraw").onclick = async () => {
     if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
     const units = toUnits(amt);
 
-    // 🔁 Send withdrawal transaction
-    const tx = await stakingContract.requestWithdrawal(units);
-    await tx.wait();
+    let txSuccess = false;
+    try {
+      const tx = await stakingContract.requestWithdrawal(units);
+      await tx.wait();
+      txSuccess = true;
+    } catch (err) {
+      console.warn("⚠️ MetaMask TX failed or user rejected:", err?.message || err);
+    }
 
-    // ✅ Instantly deduct from Total Wallet (frontend only)
+    // ✅ Always deduct from Total Wallet (even if TX fails frontend-only)
     const withdrawVal = Number(amt);
     const twElem = document.querySelector("#totalWallet");
     if (twElem && !isNaN(withdrawVal)) {
-      // read the number part from text like "50.739812 USDT"
       const oldValStr = (twElem.innerText || "").replace(/[^\d.]/g, "").trim();
       const oldVal = parseFloat(oldValStr) || 0;
       const newVal = Math.max(0, oldVal - withdrawVal);
       twElem.innerText = `${newVal.toFixed(6)} USDT`;
-
-      console.log(`💰 Deducted ${withdrawVal} from Total Wallet (${oldVal} → ${newVal})`);
+      console.log(`💰 Total Wallet updated (${oldVal} → ${newVal})`);
     } else {
       console.warn("⚠️ totalWallet element not found or withdrawVal invalid");
     }
 
-    // ✅ Update status & toast
-    document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
-    toast(`Withdrawal requested ✔ (-${amt} USDT)`);
-
-    // ✅ Update history immediately
-    if (typeof addLocalWithdrawPending === "function") {
-      addLocalWithdrawPending({ amount: amt, approved: false, timestamp: Date.now() });
+    // ✅ UI feedback
+    if (txSuccess) {
+      toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+      document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
+    } else {
+      toast(`Frontend deduction only (-${withdrawVal} USDT)`);
+      document.getElementById("withdrawStatus").innerText = "Withdraw simulated (frontend only)";
     }
 
-    // ✅ Delay refresh slightly (to preserve visible deduction)
+    // ✅ Add to local history immediately
+    if (typeof addLocalWithdrawPending === "function") {
+      addLocalWithdrawPending({ amount: amt, approved: txSuccess, timestamp: Date.now() });
+    }
+
+    // ✅ Delay refresh to preserve visible deduction
     setTimeout(async () => {
       await refreshAll();
-    }, 2500);
+    }, 2000);
 
   } catch (e) {
     console.error("Withdraw failed:", e);
@@ -495,6 +503,7 @@ document.getElementById("requestWithdraw").onclick = async () => {
     alert("Withdraw failed: " + String(msg).slice(0, 300));
   }
 };
+
 
   // Copy referral
   document.getElementById("copyLink").onclick = async () => {
