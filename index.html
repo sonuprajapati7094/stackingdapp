@@ -448,7 +448,7 @@ function attachUIHandlers(){
     }
   };
 
- // withdraw
+  // withdraw
 document.getElementById("requestWithdraw").onclick = async () => {
   try {
     if (!stakingContract) return alert("Connect wallet first");
@@ -463,13 +463,14 @@ document.getElementById("requestWithdraw").onclick = async () => {
     const withdrawVal = Number(amt);
     const twElem = document.getElementById("totalWallet"); // ✅ Correct ID
     if (twElem && withdrawVal) {
-      const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.-]+/g, "")) || 0;
+      const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.\-]+/g, "")) || 0;
       const newVal = Math.max(0, oldVal - withdrawVal);
       twElem.innerText = `${newVal.toFixed(6)} USDT`;
     }
 
-    // Show toast + history
+    // ✅ Update UI instantly
     toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+    document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
     addLocalWithdrawPending(rec);
     await refreshAll();
 
