@@ -448,37 +448,37 @@ function attachUIHandlers(){
     }
   };
 
-  // Request Withdraw
-  document.getElementById("requestWithdraw").onclick = async () => {
-    try {
-      if (!stakingContract) return alert("Connect wallet first");
-      const amt = document.getElementById("withdrawAmt").value;
-      if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
-      const units = toUnits(amt);
+ // withdraw
+document.getElementById("requestWithdraw").onclick = async () => {
+  try {
+    if (!stakingContract) return alert("Connect wallet first");
+    const amt = document.getElementById("withdrawAmt").value;
+    if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
+    const units = toUnits(amt);
 
-      const tx = await stakingContract.requestWithdrawal(units);
-      const rec = await tx.wait();
+    const tx = await stakingContract.requestWithdrawal(units);
+    const rec = await tx.wait();
 
-   // On success, immediately deduct from Total Wallet (frontend only)
-const withdrawVal = Number(document.getElementById("withdrawAmt").value);
-const twElem = document.getElementById("totalWallet");
-if (twElem && withdrawVal) {
-  const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.-]+/g,"")) || 0;
-  const newVal = Math.max(0, oldVal - withdrawVal);
-  twElem.innerText = `${newVal.toFixed(6)} USDT`;
-}
-// Add to history instantly
-toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
-addLocalWithdrawPending(rec);
-await refreshAll();
-
-
-    } catch (e) {
-      console.error("Withdraw failed:", e);
-      const msg = e?.error?.message || e?.data?.message || e?.message || e;
-      alert("Withdraw failed: " + String(msg).slice(0,300));
+    // 🧮 On success, immediately deduct from Total Wallet (frontend only)
+    const withdrawVal = Number(amt);
+    const twElem = document.getElementById("totalWallet"); // ✅ Correct ID
+    if (twElem && withdrawVal) {
+      const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.-]+/g, "")) || 0;
+      const newVal = Math.max(0, oldVal - withdrawVal);
+      twElem.innerText = `${newVal.toFixed(6)} USDT`;
     }
-  };
+
+    // Show toast + history
+    toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+    addLocalWithdrawPending(rec);
+    await refreshAll();
+
+  } catch (e) {
+    console.error("Withdraw failed:", e);
+    const msg = e?.error?.message || e?.data?.message || e?.message || e;
+    alert("Withdraw failed: " + String(msg).slice(0, 300));
+  }
+};
 
   // Copy referral
   document.getElementById("copyLink").onclick = async () => {
