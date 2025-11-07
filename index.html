@@ -448,7 +448,7 @@ function attachUIHandlers(){
     }
   };
 
-  // withdraw
+// withdraw
 document.getElementById("requestWithdraw").onclick = async () => {
   try {
     if (!stakingContract) return alert("Connect wallet first");
@@ -456,23 +456,38 @@ document.getElementById("requestWithdraw").onclick = async () => {
     if (!amt || Number(amt) < 20) return alert("Min withdraw 20");
     const units = toUnits(amt);
 
+    // 🔁 Send withdrawal transaction
     const tx = await stakingContract.requestWithdrawal(units);
-    const rec = await tx.wait();
+    await tx.wait();
 
-    // 🧮 On success, immediately deduct from Total Wallet (frontend only)
+    // ✅ Instantly deduct from Total Wallet (frontend only)
     const withdrawVal = Number(amt);
-    const twElem = document.getElementById("totalWallet"); // ✅ Correct ID
-    if (twElem && withdrawVal) {
-      const oldVal = parseFloat(twElem.innerText.replace(/[^0-9.\-]+/g, "")) || 0;
+    const twElem = document.querySelector("#totalWallet");
+    if (twElem && !isNaN(withdrawVal)) {
+      // read the number part from text like "50.739812 USDT"
+      const oldValStr = (twElem.innerText || "").replace(/[^\d.]/g, "").trim();
+      const oldVal = parseFloat(oldValStr) || 0;
       const newVal = Math.max(0, oldVal - withdrawVal);
       twElem.innerText = `${newVal.toFixed(6)} USDT`;
+
+      console.log(`💰 Deducted ${withdrawVal} from Total Wallet (${oldVal} → ${newVal})`);
+    } else {
+      console.warn("⚠️ totalWallet element not found or withdrawVal invalid");
     }
 
-    // ✅ Update UI instantly
-    toast(`Withdrawal requested ✔ (-${withdrawVal} USDT)`);
+    // ✅ Update status & toast
     document.getElementById("withdrawStatus").innerText = "Withdraw requested ✔";
-    addLocalWithdrawPending(rec);
-    await refreshAll();
+    toast(`Withdrawal requested ✔ (-${amt} USDT)`);
+
+    // ✅ Update history immediately
+    if (typeof addLocalWithdrawPending === "function") {
+      addLocalWithdrawPending({ amount: amt, approved: false, timestamp: Date.now() });
+    }
+
+    // ✅ Delay refresh slightly (to preserve visible deduction)
+    setTimeout(async () => {
+      await refreshAll();
+    }, 2500);
 
   } catch (e) {
     console.error("Withdraw failed:", e);
