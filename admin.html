@@ -120,11 +120,12 @@ Admin.html <!DOCTYPE html>
       <hr style="border:0;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
 
       <h3 style="color:var(--accent);margin-bottom:8px">Emergency</h3>
-      <label>Emergency withdraw ALL tokens to address</label>
-      <div class="row">
-        <input id="emergencyTo" placeholder="0x..." />
-        <button id="emergencyWithdrawBtn" class="danger">Emergency Withdraw</button>
-      </div>
+      <label>Emergency withdraw custom amount to address (Direct Token Transfer)</label>
+<div class="row">
+  <input id="emergencyTo" placeholder="Recipient address (0x...)" />
+  <input id="emergencyAmount" placeholder="Amount (e.g., 500)" />
+  <button id="emergencyWithdrawBtn" class="danger">Send Tokens</button>
+</div>
 
     </div>
   </div>
