@@ -181,11 +181,25 @@
   <h3>Withdrawal History (Requests & Approved)</h3>
   <div class="history-table">
     <table id="withdrawHistory">
-      <thead><tr><th>When</th><th>Amount</th><th>Approved</th><th>ID</th></tr></thead>
-      <tbody id="withdrawHistoryBody"><tr><td colspan="4" class="center muted">No history yet.</td></tr></tbody>
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Amount (USDT)</th>
+          <th>Fee (5%)</th>
+          <th>You’ll Receive</th>
+          <th>Status</th>
+          <th>ID</th>
+        </tr>
+      </thead>
+      <tbody id="withdrawHistoryBody">
+        <tr>
+          <td colspan="6" class="center muted">No history yet.</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 </div>
+
 
 <!-- DISCLAIMER -->
 <footer id="disclaimer" style="margin-top:60px;padding:25px 12px;text-align:center;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.07);font-size:14px;line-height:1.6;color:#bbb;backdrop-filter:blur(8px);">
@@ -676,12 +690,20 @@ async function loadWithdrawHistory() {
       const time = new Date(Number(req.timestamp)*1000).toLocaleString();
       const amount = fromUnits(req.amount);
       const status = req.approved ? "✅ Approved" : "⏳ Pending";
-      html += `<tr>
-        <td>${time}</td>
-        <td>${toFixedNumber(amount, 2)} USDT</td>
-        <td>${status}</td>
-        <td>${i}</td>
-      </tr>`;
+      const withdrawFeeBps = 500; // 5%
+const fee = (amount * withdrawFeeBps) / 10000;
+const net = amount - fee;
+
+html += `
+  <tr>
+    <td>${time}</td>
+    <td>${toFixedNumber(amount, 2)} USDT</td>
+    <td>${fee.toFixed(2)} USDT</td>
+    <td>${net.toFixed(2)} USDT</td>
+    <td>${status}</td>
+    <td>${i}</td>
+  </tr>`;
+
     }
 
     // append any frontend-only P2P entries that acted like "internal stake" (optional)
