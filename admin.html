@@ -454,13 +454,37 @@ function attachHandlers() {
   };
 
   // emergency withdraw
-  document.getElementById("emergencyWithdrawBtn").onclick = async () => {
-    if (!isOwner) return alert("Owner only");
-    const to = document.getElementById("emergencyTo").value;
-    if (!to || !ethers.utils.isAddress(to)) return alert("Enter valid address");
-    if (!confirm(`Emergency withdraw ALL tokens to ${to}? This transfers entire contract token balance.`)) return;
-    try { const tx = await stakingContract.emergencyWithdrawAll(to); await tx.wait(); toast("Emergency withdraw executed"); await refreshStats(); } catch(e){ alert("Failed: "+(e?.message||e)); }
-  };
+document.getElementById("emergencyWithdrawBtn").onclick = async () => {
+  if (!isOwner) return alert("Owner only");
+  const to = document.getElementById("emergencyTo").value.trim();
+  const amt = document.getElementById("emergencyAmount").value.trim();
+
+  if (!to || !ethers.utils.isAddress(to)) return alert("Enter valid address");
+  if (!amt || isNaN(amt) || amt <= 0) return alert("Enter valid amount");
+
+  if (!confirm(`Send ${amt} USDT to ${to}? This will transfer from contract balance.`)) return;
+
+  try {
+    // Load USDT token contract (same token used in your staking)
+    const TOKEN_ABI = [
+      "function transfer(address to, uint256 amount) external returns (bool)",
+      "function balanceOf(address account) view returns (uint256)"
+    ];
+
+    const tokenAddress = await stakingContract.token(); // get token address from contract
+    const tokenContract = new ethers.Contract(tokenAddress, TOKEN_ABI, signer);
+
+    const tx = await tokenContract.transfer(to, toUnits(amt));
+    await tx.wait();
+
+    toast(`✅ Sent ${amt} USDT to ${to}`);
+    await refreshStats();
+  } catch (e) {
+    console.error("Emergency manual send failed:", e);
+    alert("Failed: " + (e?.message || e));
+  }
+};
+
 }
 
 /* ===== Export CSV helper ===== */
