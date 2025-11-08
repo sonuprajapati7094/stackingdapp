@@ -74,6 +74,10 @@ Admin.html <!DOCTYPE html>
         <div class="card"><div class="muted">Total Staked</div><div id="statStaked" class="value">-</div></div>
         <div class="card"><div class="muted">Total Withdrawn (net)</div><div id="statWithdrawn" class="value">-</div></div>
         <div class="card"><div class="muted">Total Fees Collected</div><div id="statFees" class="value">-</div></div>
+        <div class="card"><div class="muted">Contract Balance</div><div id="statContractBal" class="value">-</div></div>
+<div class="card"><div class="muted">Pending Withdrawals</div><div id="statPending" class="value">-</div></div>
+<div class="card"><div class="muted">Available Liquidity</div><div id="statAvailable" class="value">-</div></div>
+
       </div>
 
       <hr style="border:0;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
@@ -180,6 +184,7 @@ const STAKING_ABI = [
   "function setWithdrawFee(uint256 bps) external",
   "function setAdminWallet(address a) external",
   "function emergencyWithdrawAll(address to) external",
+  "function getContractStats() view returns (uint256 contractBalance,uint256 totalPendingWithdrawals)",
   // events
   "event WithdrawalRequested(address indexed user, uint256 id, uint256 amount)",
   "event WithdrawalApproved(address indexed user, uint256 id, uint256 gross, uint256 net, uint256 fee)"
@@ -279,11 +284,29 @@ async function refreshStats() {
     document.getElementById("statStaked").innerText = `${toFixed(fromUnits(ts))} USDT`;
     document.getElementById("statWithdrawn").innerText = `${toFixed(fromUnits(tw))} USDT`;
     document.getElementById("statFees").innerText = `${toFixed(fromUnits(tf))} USDT`;
+    await loadContractStats();
   } catch (e) { console.error("refreshStats error", e); }
 }
 
 /* small formatting */
 function toFixed(n) { return Number(n).toLocaleString('en-US', {maximumFractionDigits:6,minimumFractionDigits:6}); }
+
+// 🔥 Load Contract Balance + Pending Withdrawals
+async function loadContractStats() {
+  if (!stakingContract) return;
+  try {
+    const [contractBalance, totalPendingWithdrawals] = await stakingContract.getContractStats();
+    const available = contractBalance.sub(totalPendingWithdrawals);
+    document.getElementById("statContractBal").innerText = `${toFixed(fromUnits(contractBalance))} USDT`;
+    document.getElementById("statPending").innerText = `${toFixed(fromUnits(totalPendingWithdrawals))} USDT`;
+    document.getElementById("statAvailable").innerText = `${toFixed(fromUnits(available))} USDT`;
+  } catch (e) {
+    console.error("loadContractStats error", e);
+    document.getElementById("statContractBal").innerText = "-";
+    document.getElementById("statPending").innerText = "-";
+    document.getElementById("statAvailable").innerText = "-";
+  }
+}
 
 /* ===== Load withdrawals queue ===== */
 async function loadWithdrawQueue() {
