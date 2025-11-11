@@ -3,7 +3,7 @@ Admin.html <!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Panel — USDT Staking (BSC Testnet)</title>
+  <title>Admin Panel — USDT Staking Dashboard</title>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
@@ -40,7 +40,7 @@ Admin.html <!DOCTYPE html>
   </style>
 </head>
 <body>
-<header><h1>Admin Panel — USDT Staking (BSC Testnet)</h1></header>
+<header><h1>Admin Panel — USDT Staking - Dashboard</h1></header>
 <div class="topbar">
   <div id="walletDisplay" class="muted">Not connected</div>
   <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
@@ -160,9 +160,9 @@ Admin.html <!DOCTYPE html>
 <script>
 /* ===== CONFIG ===== */
 const CONFIG = {
-  stakingAddress: "0x0c38576d85677dE210DD1C68378604d3AacfAB27",
-  decimals: 6,
-  desiredChainId: 97 // BSC Testnet
+  stakingAddress: "0x633Bd9B986b94aA2eED3D0920285EE2428c194bA", // ✅ YOUR mainnet contract
+  decimals: 18,  // ✅ mainnet USDT = 18 decimals in your contract
+  desiredChainId: 56 // ✅ BSC Mainnet
 };
 
 /* ===== ABI (admin functions + useful views) ===== */
@@ -218,9 +218,9 @@ async function initProvider(tempProvider) {
   const net = await provider.getNetwork();
   if (net.chainId !== CONFIG.desiredChainId) {
     try {
-      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x61' }] });
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
       location.reload();
-      return;
+      return; 
     } catch (e) {
       toast("Please switch MetaMask to BSC Testnet (97)");
     }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Full Staking DApp — Dashboard (BSC Testnet)</title>
+  <title>Full Staking DApp — Dashboard </title>
 
   <!-- ethers v5 -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -44,7 +44,7 @@
   </style>
 </head>
 <body>
-<header><h1>USDT Staking — Full DApp (BSC Testnet)</h1></header>
+<header><h1>USDT Staking — Dashboard</h1></header>
 <div class="topbar">
   <div id="walletDisplay" class="muted">Not connected</div>
   <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
@@ -206,8 +206,9 @@
   <div style="max-width:900px;margin:auto;">
     <h3 style="color:#fff;font-size:16px;margin-bottom:8px;">⚠️ Disclaimer</h3>
     <p>
-      This DApp interacts with on-chain smart contracts. This UI will simulate some actions (P2P) frontend-only as requested.
-      Always be careful on mainnet — use testnet while testing.
+      Cryptocurrency, blockchain projects, and digital asset staking involve market risks. 
+      Returns shown or mentioned are never guaranteed. Token prices can be highly volatile, and users should always conduct their own research before investing. 
+      By using this platform, you acknowledge that all staking or investment decisions are made at your own risk, and the platform is not responsible for any financial loss arising from market fluctuations, smart contract behavior, or user actions.
     </p>
     <div style="margin-top:14px;font-size:13px;color:#888;">
       &copy; <script>document.write(new Date().getFullYear());</script> USDT Staking dashboard.
@@ -221,10 +222,10 @@
 <script>
 /* ======= CONFIG - keeping your provided addresses ======= */
 const CONFIG = {
-  tokenAddress: "0x1a904b37B0d9D6ab755aBDa4656E42F278FC89AA",
-  stakingAddress: "0x0c38576d85677dE210DD1C68378604d3AacfAB27",
-  decimals: 6,
-  desiredChainId: 97 // BSC Testnet
+  tokenAddress: "0x55d398326f99059fF775485246999027B3197955", // ✅ mainnet USDT (18 decimals)
+  stakingAddress: "0x633Bd9B986b94aA2eED3D0920285EE2428c194bA", // ✅ YOUR deployed contract
+  decimals: 18,
+  desiredChainId: 56 // ✅ BSC MAINNET
 };
 
 /* ======= Minimal ABI required (kept to functions we use) ======= */
@@ -305,7 +306,7 @@ async function initProviderFromProviderObj(tempProvider) {
     try {
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x61' }] // 97
+      params: [{ chainId: '0x38' }] // 56 mainnet
       });
       // reload to re-init
       location.reload();
