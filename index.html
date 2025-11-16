@@ -71,6 +71,15 @@
     </div>
 
     <div class="card">
+      <h2>P2P Stake (Stake For)</h2>
+      <div class="muted">Frontend-only P2P: deducts from your on-site Total Wallet (no MetaMask popup)</div>
+      <input id="p2pAmount" type="number" placeholder="P2P amount (min 20)" />
+      <input id="p2pAddress" type="text" placeholder="Recipient wallet address" style="margin-top:8px" />
+      <button id="stakeForBtn" class="accent-btn" style="margin-top:10px">Stake For (P2P) — frontend only</button>
+      <div id="p2pStatus" class="muted" style="margin-top:8px">P2P actions will update your on-site wallet balance immediately.</div>
+    </div>
+
+    <div class="card">
       <h2>Your Referral Link</h2>
       <input id="refLink" type="text" readonly placeholder="Connect wallet to generate link" />
       <div style="display:flex;gap:8px;margin-top:8px">
