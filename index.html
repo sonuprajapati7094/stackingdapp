@@ -623,11 +623,12 @@ async function refreshAll() {
     document.getElementById("totalWallet").innerText = `${toFixedNumber(totalWallet, 6)} USDT`;
     document.getElementById("pkgStatus").innerText = isActive ? "✅ Active" : "Inactive";
 
-    // withdrawable
-    const withdrawableBn = await stakingContract.getWithdrawable(account).catch(()=>ethers.constants.Zero);
-    const withdrawable = fromUnits(withdrawableBn || 0);
-    document.getElementById("withdrawableDisplay").innerText = `Withdrawable: ${toFixedNumber(withdrawable,6)} USDT`;
+  // Correct total withdrawable:
+const withdrawable = roiLive + instantIncome + levelIncome - pendingWithdrawals;
 
+document.getElementById("withdrawableDisplay").innerText =
+  `Withdrawable: ${toFixedNumber(Math.max(0, withdrawable), 6)} USDT`;
+  
     // days to 3x
     const daysBn = await stakingContract.getTimeTo3x(account).catch(()=>0);
     document.getElementById("days3x").innerText = (Number(daysBn) || 0) + " days";
