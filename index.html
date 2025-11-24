@@ -593,8 +593,7 @@ async function refreshAll() {
   if (!stakingContract || !account) return;
   // live ROI (view)
   await updateLiveROIDisplay();
-
-    await stakingContract.updateMyROI().catch(()=>{});
+  
 
   try {
     // wallet token balance (on Metamask)
@@ -788,12 +787,6 @@ if (window.ethereum) {
   });
   window.ethereum.on("chainChanged", () => { location.reload(); });
 }
-// 🔄 Auto ROI Sync every 10 seconds
-setInterval(() => {
-  if (stakingContract && account) {
-    stakingContract.updateMyROI().catch(()=>{});
-  }
-}, 10000);
 </script>
 <!-- ======= END ======= -->
 </body>
