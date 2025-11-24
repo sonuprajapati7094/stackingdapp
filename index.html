@@ -613,7 +613,7 @@ async function refreshAll() {
 
     // totalWallet should use live ROI (we already updated roiPending via getLiveROI)
     const roiLive = lastLiveRoiValue || roiOnChain;
-    const totalWallet = Number(roiLive) + Number(instantIncome) + Number(levelIncome);
+    const totalWallet = roiLive + instantIncome + levelIncome - pendingWithdrawals;
 
     document.getElementById("stakedDisplay").innerText = `${toFixedNumber(staked, 6)} USDT`;
     document.getElementById("targetDisplay").innerText = `${toFixedNumber(staked * 3, 6)} USDT`;
@@ -628,7 +628,7 @@ const withdrawable = roiLive + instantIncome + levelIncome - pendingWithdrawals;
 
 document.getElementById("withdrawableDisplay").innerText =
   `Withdrawable: ${toFixedNumber(Math.max(0, withdrawable), 6)} USDT`;
-  
+
     // days to 3x
     const daysBn = await stakingContract.getTimeTo3x(account).catch(()=>0);
     document.getElementById("days3x").innerText = (Number(daysBn) || 0) + " days";
