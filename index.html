@@ -312,12 +312,98 @@ footer{
 }
 
 </style>
+
+  /* ===== WEB3 WALLET TOPBAR ===== */
+
+.wallet-left{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.wallet-avatar{
+width:36px;
+height:36px;
+border-radius:50%;
+background:linear-gradient(135deg,#22c55e,#16a34a);
+box-shadow:0 0 10px rgba(34,197,94,0.35);
+}
+
+.wallet-info{
+display:flex;
+flex-direction:column;
+line-height:1.2;
+}
+
+#walletAddress{
+font-weight:600;
+font-size:14px;
+}
+
+.walletBalanceRow{
+display:flex;
+gap:8px;
+align-items:center;
+}
+
+#walletBalance{
+font-size:12px;
+color:#6b7280;
+}
+
+.network{
+font-size:11px;
+padding:2px 6px;
+background:#dcfce7;
+color:#065f46;
+border-radius:6px;
+font-weight:600;
+}
+
+/* MOBILE */
+
+@media(max-width:600px){
+
+.topbar{
+flex-direction:row;
+justify-content:space-between;
+}
+
+.wallet-avatar{
+width:32px;
+height:32px;
+}
+
+#walletAddress{
+font-size:13px;
+}
+
+}
 </head>
 <body>
 <header><h1>USDT Staking — Dashboard</h1></header>
 <div class="topbar">
-  <div id="walletDisplay" class="muted">Not connected</div>
-  <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
+
+<div class="wallet-left">
+
+<div class="wallet-avatar"></div>
+
+<div class="wallet-info">
+<div id="walletAddress">Not Connected</div>
+
+<div class="walletBalanceRow">
+<span id="walletBalance">0 USDT</span>
+<span class="network">BSC</span>
+</div>
+
+</div>
+
+</div>
+
+<button id="connectBtn" class="wallet-btn">
+Connect Wallet
+</button>
+
 </div>
 
 <main class="container">
@@ -589,6 +675,19 @@ function toast(msg, ttl = 3000) {
     w.appendChild(el);
     setTimeout(()=>{ el.style.opacity = 0; setTimeout(()=>el.remove(),400); }, ttl);
   } catch(e){ console.log("toast err",e); }
+}
+  function shortAddress(addr){
+return addr.slice(0,6) + "..." + addr.slice(-4);
+}
+
+function updateWalletUI(address,balance){
+
+document.getElementById("walletAddress").innerText =
+shortAddress(address)
+
+document.getElementById("walletBalance").innerText =
+balance + " USDT"
+
 }
 function toFixedNumber(v, d = 6) {
   if (isNaN(v)) return "0.000000";
@@ -868,8 +967,7 @@ async function refreshAll() {
     // wallet token balance (on Metamask)
     const rawBal = await tokenContract.balanceOf(account).catch(()=>0);
     const walletBal = fromUnits(rawBal);
-    document.getElementById("walletDisplay").innerText =
-      `${account} — ${toFixedNumber(walletBal, 4)} USDT`;
+    updateWalletUI(account,toFixedNumber(walletBal,4))
 
     // Fetch snapshot
     const snapshot = await stakingContract.users(account).catch(()=>null);
