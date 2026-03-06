@@ -63,12 +63,12 @@ header h1{
   border:0;
   font-weight:600;
   cursor:pointer;
-  transition:0.2s;
+  transition:all .25s ease;
 }
 
 .wallet-btn:hover{
-  transform:translateY(-1px);
-  box-shadow:0 4px 12px rgba(34,197,94,0.4);
+  transform:translateY(-2px);
+  box-shadow:0 6px 14px rgba(34,197,94,0.35);
 }
 
 /* MAIN CONTAINER */
@@ -98,6 +98,12 @@ header h1{
   padding:16px;
   border:1px solid #e5e7eb;
   box-shadow:0 3px 10px rgba(0,0,0,0.05);
+  transition:all .25s ease;
+}
+
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 14px rgba(0,0,0,0.08);
 }
 
 .card h2{
@@ -123,12 +129,13 @@ input, textarea{
   background:#fff;
   color:#111827;
   box-sizing:border-box;
-  transition:0.2s;
+  transition:all .2s ease;
 }
 
 input:focus{
   border-color:var(--accent);
   outline:none;
+  box-shadow:0 0 0 2px rgba(34,197,94,0.15);
 }
 
 /* BUTTONS */
@@ -141,10 +148,12 @@ input:focus{
   color:#111827;
   cursor:pointer;
   margin-top:8px;
+  transition:all .2s ease;
 }
 
 .small-btn:hover{
   background:#e5e7eb;
+  transform:translateY(-1px);
 }
 
 .accent-btn{
@@ -156,11 +165,12 @@ input:focus{
   cursor:pointer;
   font-weight:700;
   margin-top:8px;
-  transition:0.2s;
+  transition:all .25s ease;
 }
 
 .accent-btn:hover{
-  box-shadow:0 4px 14px rgba(34,197,94,0.35);
+  transform:translateY(-2px);
+  box-shadow:0 6px 14px rgba(34,197,94,0.35);
 }
 
 /* RIGHT SIDE */
@@ -181,30 +191,32 @@ input:focus{
 
 /* INCOME CARDS */
 
-.grid-4 div{
-  background:var(--accent-soft);
-  border:1px solid #bbf7d0;
+/* remove black background forcefully */
+.grid-4 > div{
+  background:var(--accent-soft) !important;
+  border:1px solid #bbf7d0 !important;
   border-radius:12px;
   padding:16px;
-  transition:0.25s;
+  transition:all .25s ease;
+  box-shadow:none !important;
 }
 
-.grid-4 div:hover{
+.grid-4 > div:hover{
   transform:translateY(-2px);
   box-shadow:0 6px 14px rgba(0,0,0,0.08);
 }
 
-/* VALUE TEXT */
+/* VALUE TEXT (slightly smaller) */
 
-.value{
-  font-size:20px;
+.grid-4 .value{
+  font-size:16px;
   font-weight:700;
   color:#111827;
 }
 
 /* LABEL TEXT */
 
-.label{
+.grid-4 .label{
   font-size:13px;
   color:#065f46;
   margin-top:6px;
@@ -290,24 +302,6 @@ footer{
 
 .grid-4{
   grid-template-columns:repeat(2,1fr);
-}
-  /* remove black background from income cards */
-.grid-4 > div{
-  background:#dcfce7 !important;
-  border:1px solid #bbf7d0 !important;
-  border-radius:10px;
-  padding:12px;
-  box-shadow:none !important;
-}
-
-/* label text */
-.grid-4 > div .label{
-  color:#065f46 !important;
-}
-
-/* value text */
-.grid-4 > div .value{
-  color:#000 !important;
 }
 
 }
