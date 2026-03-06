@@ -291,6 +291,24 @@ footer{
 .grid-4{
   grid-template-columns:repeat(2,1fr);
 }
+  /* remove black background from income cards */
+.grid-4 > div{
+  background:#dcfce7 !important;
+  border:1px solid #bbf7d0 !important;
+  border-radius:10px;
+  padding:12px;
+  box-shadow:none !important;
+}
+
+/* label text */
+.grid-4 > div .label{
+  color:#065f46 !important;
+}
+
+/* value text */
+.grid-4 > div .value{
+  color:#000 !important;
+}
 
 }
 
