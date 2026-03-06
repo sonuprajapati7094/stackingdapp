@@ -8,7 +8,7 @@
   <!-- ethers v5 -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
- <style>
+<style>
 :root{
   --bg:#f4f6fb;
   --card:#ffffff;
@@ -138,6 +138,26 @@ input, textarea{
   display:grid;
   grid-template-columns:repeat(4,1fr);
   gap:12px;
+}
+
+/* ✅ Light green income boxes */
+.grid-4 div{
+  background:#dcfce7;
+  border:1px solid #86efac;
+  border-radius:10px;
+  padding:12px;
+}
+
+.grid-4 .value{
+  font-size:18px;
+  font-weight:700;
+  color:#000;
+}
+
+.grid-4 .label{
+  font-size:12px;
+  color:#065f46;
+  margin-top:6px;
 }
 
 .value{
