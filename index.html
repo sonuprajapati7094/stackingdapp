@@ -729,8 +729,8 @@ async function initProviderFromProviderObj(tempProvider) {
   stakingContract = new ethers.Contract(CONFIG.stakingAddress, STAKING_ABI, signer);
   tokenContract = new ethers.Contract(CONFIG.tokenAddress, TOKEN_ABI, signer);
 
-  document.getElementById("walletDisplay").innerText = `${account}`;
-
+updateWalletUI(account,"0")
+  
   // referral link
   const base = window.location.href.split("?")[0];
   document.getElementById("refLink").value = `${base}?ref=${account}`;
