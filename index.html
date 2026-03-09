@@ -779,6 +779,11 @@ function toFixedNumber(v, d = 6) {
 function fromUnits(bn) {
   try { return Number(ethers.utils.formatUnits(bn, CONFIG.decimals)); } catch (e) { return 0; }
 }
+  function copyContract(){
+  const el = document.getElementById("contractAddress");
+  navigator.clipboard.writeText(el.value);
+  alert("Contract Address Copied");
+}
 function toUnits(amount) {
   // amount is number or string in human units
   return ethers.utils.parseUnits(String(amount), CONFIG.decimals);
