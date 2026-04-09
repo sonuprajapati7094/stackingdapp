@@ -411,39 +411,77 @@ Connect Wallet
 <main class="container">
 
   <!-- LEFT: Actions -->
-  <div class="left">
+ <div class="left">
 
-    <div class="card">
-  <h2>UniversalFX Official Contract</h2>
+  <div class="card">
+    <h2>UniversalFX Official Contracts</h2>
 
-  <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+    <!-- Contract 1 -->
+    <div style="margin-top:15px">
 
-    <div class="muted">Contract Address:</div>
+      <div class="muted">Main Contract:</div>
 
-    <input 
-      type="text" 
-      value="0xA96Be652A08D9905F15B7FbE2255708709BeCD09"
-      id="contractAddress"
-      readonly
-      style="flex:1"
-    />
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
 
-    <button class="small-btn" onclick="copyContract()">
-      Copy
-    </button>
+        <input 
+          type="text" 
+          value="0xA96Be652A08D9905F15B7FbE2255708709BeCD09"
+          id="contract1"
+          readonly
+          style="flex:1"
+        />
 
-    <a 
-      href="https://bscscan.com/address/0xA96Be652A08D9905F15B7FbE2255708709BeCD09"
-      target="_blank"
-    >
-      <button class="accent-btn">
-        View on BSCScan
-      </button>
-    </a>
+        <button class="small-btn" onclick="copyText('contract1')">
+          Copy
+        </button>
+
+        <a 
+          href="https://bscscan.com/address/0xA96Be652A08D9905F15B7FbE2255708709BeCD09"
+          target="_blank"
+        >
+          <button class="accent-btn">
+            BSCScan
+          </button>
+        </a>
+
+      </div>
+    </div>
+
+
+    <!-- Contract 2 -->
+    <div style="margin-top:20px">
+
+      <div class="muted">USDT Contract:</div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+
+        <input 
+          type="text" 
+          value="0x55d398326f99059fF775485246999027B3197955"
+          id="contract2"
+          readonly
+          style="flex:1"
+        />
+
+        <button class="small-btn" onclick="copyText('contract2')">
+          Copy
+        </button>
+
+        <a 
+          href="https://bscscan.com/address/0x55d398326f99059fF775485246999027B3197955"
+          target="_blank"
+        >
+          <button class="accent-btn">
+            BSCScan
+          </button>
+        </a>
+
+      </div>
+    </div>
 
   </div>
-</div>
 
+</div>
     <div class="card">
   <h2>UniversalFX Community</h2>
 
